@@ -18,6 +18,9 @@ import (
 	
 */
 
+func newUserInteface(){
+	
+}
 
 
 

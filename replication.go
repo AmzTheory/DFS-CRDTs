@@ -34,6 +34,18 @@ type replicationLayer struct{
 	cmap contentMap
 }
 
+//initalisation
+func newReplicationLayer(){
+	return replicationLayer{
+								set:	[]replicationElement{},
+								cmap:	make(map[string]string)
+							}
+}
+func (l replicationLayer) (Dfs dfs){
+	l.dfs=dfs
+}
+
+
 
 //update inteface
 

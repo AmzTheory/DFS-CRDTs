@@ -20,10 +20,27 @@ import (
 
 
 type Dfs stuct{
+	//userInterface
 	hier hierLayer
 	rep  replicationLayer
-	//userInterface
 }
+
+func newDfs(){
+	d :=Dfs { 
+				newhierLayer(),
+				newReplicationLayer()
+			}
+}
+func (Dfs dfs) start(){
+	d=newDfs()
+	d.rep.setDfs(dfs)
+	d.hier.setDfs(dfs)
+
+	//add root
+	//pass it to to interface
+	
+}
+
 
 
 
