@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
+
+	lls "github.com/emirpasic/gods/stacks/linkedliststack"
 )
 
 func main() {
 	//actual DFS running
-	ls := []replicationElement{
-		replicationElement{name: "A", elementType: "t1"},
-		replicationElement{name: "A/B", elementType: "t2"},
-	}
-
-	for _, el := range ls {
-		fmt.Println("%s", el.elementType)
-	}
+	st := lls.New()
+	st.Push("Ahmed")
+	st.Push("Saeed")
+	s, _ := st.Pop()
+	fmt.Println(s)
 }

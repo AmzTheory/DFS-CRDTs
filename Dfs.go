@@ -25,9 +25,9 @@ func newDfs() *Dfs {
 	d := Dfs{hier: newhierLayer(), rep: newReplicationLayer()}
 	return &d
 }
-func (d *Dfs) start() {
-	(*d).rep.setDfs(d)
-	(*d).hier.setDfs(d)
+func (d Dfs) start() {
+	d.rep.setDfs(&d)
+	d.hier.setDfs(&d)
 
 	//add root
 	//pass it to to interface
@@ -44,7 +44,7 @@ func (dfs Dfs) updateRemoveHier(path string, typ string)        {}
 
 //Hier to replication
 func (dfs Dfs) UpdateAddReplication(path string, typ string) {
-	dfs.rep.add(path, typ)
+	 dfs.rep.add(path, typ)
 }
 func (dfs Dfs) UpdateRemoveReplication(path string, typ string) {
 	dfs.rep.remove(path, typ)
@@ -55,6 +55,6 @@ func (dfs Dfs) UpdateRemoveReplication(path string, typ string) {
 //upwards
 
 func (dfs Dfs) updateHier(cmap map[string]string) {
-	//	dfs.
+	// dfs.hier.
 }
-func (dfs Dfs) updateInterface(tree DfsTree) {}
+// func (dfs Dfs) updateInterface(tree DfsTree) {}

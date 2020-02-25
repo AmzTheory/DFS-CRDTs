@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 )
+
 /*
 fields
 	SET (assume its and ORSET) string
@@ -21,7 +22,7 @@ type replicationElement struct {
 	name        string
 	elementType string
 }
-type elementSet []replicationElement
+type elementSet []*replicationElement
 type contentMap map[string]string
 
 type replicationLayer struct {
@@ -31,15 +32,15 @@ type replicationLayer struct {
 }
 
 //initalisation
-func newReplicationLayer() *replicationLayer{
-	el:=replicationElement{name:"root",
-							elementType: "dir",}
-	s:=[]replicationElement{el}
-	
-	dic:=make(map[string]string)
-	dic[el.name+","+el.elementType]=""
+func newReplicationLayer() *replicationLayer {
+	el := replicationElement{name: "root",
+		elementType: "dir"}
+	s := []*replicationElement{&el}
 
-	l:= replicationLayer{
+	dic := make(map[string]string)
+	dic[el.name] = ""
+
+	l := replicationLayer{
 		set:  s,
 		cmap: dic,
 	}
@@ -53,16 +54,16 @@ func (l replicationLayer) setDfs(dfs *Dfs) {
 //update inteface
 
 func (l replicationLayer) add(path string, typ string) {
-	el := replicationElement{name:path,elementType: typ,}
-	l.set = append(l.set, el)
-	l.cmap[el.name+""+el.elementType] = "" //initate with an empty content
+	el := replicationElement{name: path, elementType: typ}
+	l.set = append(l.set, &el)
+	l.cmap[el.name] = "" //initate with an empty content
 	l.updateDfs()
 }
 
 func (l replicationLayer) remove(path string, typ string) {
 	//remove an element from the slice
-	temp := []replicationElement{}
-	for _,i := range l.set {
+	temp := []*replicationElement{}
+	for _, i := range l.set {
 		if !(i.name == path && i.elementType == typ) {
 			temp = append(temp, i)
 		}

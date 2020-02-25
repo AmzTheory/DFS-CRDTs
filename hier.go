@@ -2,6 +2,8 @@ package main
 
 import (
 	//"fmt"
+	"fmt"
+	"strings"
 )
 
 /*
@@ -49,29 +51,29 @@ type hierLayer struct {
 
 //initalisation
 func newhierLayer() *hierLayer {
-	ro:=DfsTreeElement {name:"root",fileType:"dir",path:"",content:"",}
-	
-	l:=hierLayer{root : &ro,
-				contentMap: make(map[string]string),
-				}
+	ro := DfsTreeElement{name: "root", fileType: "dir", path: "", content: ""}
+
+	l := hierLayer{root: &ro,
+		contentMap: make(map[string]string),
+	}
 
 	return &l
 }
 
 func (l hierLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
-	}
+}
 
 //Update Interface
 
 //add element
 func (l hierLayer) add(path string, name string, typ string) {
-	l.dfs.UpdateAddReplication(path+"/"+name,typ)
+	l.dfs.UpdateAddReplication(path+"/"+name, typ)
 }
 
 //remove element
-func (l hierLayer) remove(path string,typ string) {
-	l.dfs.UpdateRemoveReplication(path,typ)
+func (l hierLayer) remove(path string, typ string) {
+	l.dfs.UpdateRemoveReplication(path, typ)
 }
 
 // func (tree DfsTree) update(path string,name string,typ string){
@@ -83,5 +85,41 @@ func updateReplation() {
 	//communicate it to the Dfs instance
 }
 
+//modify the state based on new info from replication
+func (l hierLayer) updateState(cmap map[string]string) {
+	//go through the map and build the tree
+	fmt.Print()
+	// (Depth first)
+	// find the root , instantiate and add into stack
+	// ro := findRoot(cmap)
+	// //ignore type
+	// p,n:=pathAndName(ro)
+	// rootEl:=DfsTreeElement{name:n,fileType:"uf",path:p,children:[]DfsTreeElement{}}
+	// then add root to stack
+	// untill stack empty
+	// 	pop stack call el
+	// 	iterate throu children
+	// 		instantiate
+	// 		add reference to stack
+	// 		add reference to el children
+
+	//pass to interface
+}
+
 //return to interface
 //user interface will be looking it up
+
+//axulariy
+func findRoot(cmap map[string]string) string {
+	for k,_ :=range cmap{
+		if(!strings.Contains(k,"/")){
+			return k  //root found
+		}
+	}
+	return ""
+}
+func pathAndName(str string)(string,string) {
+	li := strings.LastIndex(str, "/")
+	return str[:li+1],str[li+1:]
+}
+
