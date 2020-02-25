@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 )
 
 /*
@@ -25,6 +25,7 @@ returns to upper layer  (assume hier is upper layer)
 //struct definitions
 
 //an element of the tree
+
 type DfsTreeElement struct {
 	name     string
 	fileType string
@@ -41,32 +42,36 @@ type DfsTree DfsTreeElement
 
 //hier layer
 type hierLayer struct {
-	dfs        Dfs
-	root       DfsTree
+	dfs        *Dfs
+	root       *DfsTreeElement
 	contentMap map[string]string
 }
 
 //initalisation
-func newhierLayer() {
-	return hierLayer{	root :     nil
-						contentMap: make(map[string]string)
-					}
+func newhierLayer() *hierLayer {
+	ro:=DfsTreeElement {name:"root",fileType:"dir",path:"",content:"",}
+	
+	l:=hierLayer{root : &ro,
+				contentMap: make(map[string]string),
+				}
+
+	return &l
 }
 
-func (l hierLayer) setDfs(dfs) {
+func (l hierLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
-}
+	}
 
 //Update Interface
 
 //add element
-func (tree hierLayer) add(path string, name string, typ string) {
-	fmt.Println("Element has been Added")
+func (l hierLayer) add(path string, name string, typ string) {
+	l.dfs.UpdateAddReplication(path+"/"+name,typ)
 }
 
 //remove element
-func (tree hierLayer) remove(path string, name string, typ string) {
-	fmt.Println("Element has been removed")
+func (l hierLayer) remove(path string,typ string) {
+	l.dfs.UpdateRemoveReplication(path,typ)
 }
 
 // func (tree DfsTree) update(path string,name string,typ string){

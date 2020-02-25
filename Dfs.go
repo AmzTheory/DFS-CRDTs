@@ -1,8 +1,6 @@
 package main
 
-import (
-	"fmt"
-)
+//"fmt"
 
 /*
 	instance of
@@ -10,55 +8,53 @@ import (
 		Hier
 		replication
 	Model communication
-		between layers		
-		
+		between layers
+
 	View of the DFS
 
 	Comunication between replicas
 		assign operations
 */
 
-
-type Dfs stuct{
-	//userInterface
-	hier hierLayer
-	rep  replicationLayer
+type Dfs struct {
+	hier *hierLayer
+	rep  *replicationLayer
 }
 
-func newDfs(){
-	d :=Dfs { 
-				newhierLayer(),
-				newReplicationLayer()
-			}
+func newDfs() *Dfs {
+	d := Dfs{hier: newhierLayer(), rep: newReplicationLayer()}
+	return &d
 }
-func (Dfs dfs) start(){
-	d=newDfs()
-	d.rep.setDfs(dfs)
-	d.hier.setDfs(dfs)
+func (d *Dfs) start() {
+	(*d).rep.setDfs(d)
+	(*d).hier.setDfs(d)
 
 	//add root
 	//pass it to to interface
-	
+
 }
-
-
-
 
 //downwards
 
 //User interface to Hier
-func (Dfs dfs) updateAddHier(path string,n string,typ string){}
-func (Dfs dfs) updateRemoveHier(path string,typ string){}
+func (dfs Dfs) updateAddHier(path string, n string, typ string) {}
+func (dfs Dfs) updateRemoveHier(path string, typ string)        {}
+
 //update
 
 //Hier to replication
-func (Dfs dfs) updateAddReplication(path string,typ string){}
-func (Dfs dfs) updateRemoveReplication(path string,typ string){}
+func (dfs Dfs) UpdateAddReplication(path string, typ string) {
+	dfs.rep.add(path, typ)
+}
+func (dfs Dfs) UpdateRemoveReplication(path string, typ string) {
+	dfs.rep.remove(path, typ)
+}
 
 //replication to other replicas (future)
 
-
 //upwards
 
-func (Dfs dfs) updateHier(cmap map[string]string){}
-func (Dfs dfs) updateInterface(tree DfsTree){}
+func (dfs Dfs) updateHier(cmap map[string]string) {
+	//	dfs.
+}
+func (dfs Dfs) updateInterface(tree DfsTree) {}
