@@ -11,17 +11,24 @@ import (
 		communicate operataions to heir layer
 
 	fields
-	operations	
+	operations
 		print out the DFS Interface
 		all DFS operations
 
 
 */
-
-func newUserInteface() {
-	fmt.Println("do something")
+type interfaceLayer struct {
+	root *DfsTreeElement
 }
 
-func printDfs() {
-	//print DFS
+func newUserInteface(root *DfsTreeElement) {
+	fmt.Println("Ahmed")
+}
+
+func (l interfaceLayer) printDfs() {
+
+}
+
+func (l *interfaceLayer) wait() {
+
 }
