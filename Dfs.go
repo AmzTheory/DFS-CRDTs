@@ -1,6 +1,8 @@
 package main
 
-//"fmt"
+// import "fmt"
+
+// "fmt"
 
 /*
 	instance of
@@ -25,9 +27,12 @@ func newDfs() *Dfs {
 	d := Dfs{hier: newhierLayer(), rep: newReplicationLayer()}
 	return &d
 }
-func (d Dfs) start() {
-	d.rep.setDfs(&d)
-	d.hier.setDfs(&d)
+func (d *Dfs) printInstanceRef() {
+	//	fmt.Println("calling reference",&d)
+}
+func (d *Dfs) start() {
+	d.rep.setDfs(d)
+	d.hier.setDfs(d)
 
 	//add root
 	//pass it to to interface
@@ -37,24 +42,27 @@ func (d Dfs) start() {
 //downwards
 
 //User interface to Hier
-func (dfs Dfs) updateAddHier(path string, n string, typ string) {}
-func (dfs Dfs) updateRemoveHier(path string, typ string)        {}
+func (d *Dfs) updateAddHier(path string, n string, typ string) {
+	d.UpdateAddReplication(path+n, typ)
+}
+func (d *Dfs) updateRemoveHier(path string, typ string) {}
 
 //update
 
 //Hier to replication
-func (dfs Dfs) UpdateAddReplication(path string, typ string) {
-	 dfs.rep.add(path, typ)
+func (d *Dfs) UpdateAddReplication(path string, typ string) {
+	d.rep.add(path, typ)
 }
-func (dfs Dfs) UpdateRemoveReplication(path string, typ string) {
-	dfs.rep.remove(path, typ)
+func (d *Dfs) UpdateRemoveReplication(path string, typ string) {
+	d.rep.remove(path, typ)
 }
 
 //replication to other replicas (future)
 
 //upwards
 
-func (dfs Dfs) updateHier(cmap map[string]string) {
-	// dfs.hier.
+func (d *Dfs) updateHier(cmap map[*replicationElement]string) {
+	d.hier.updateState(cmap) //infor hier layer
 }
-// func (dfs Dfs) updateInterface(tree DfsTree) {}
+
+// func (d Dfs) updateInterface(tree DfsTree) {}

@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+
+	set "github.com/emirpasic/gods/sets/linkedhashset"
 )
 
 /*
@@ -22,8 +24,10 @@ type replicationElement struct {
 	name        string
 	elementType string
 }
-type elementSet []*replicationElement
-type contentMap map[string]string
+
+// type elementSet []*replicationElement
+type elementSet *set.Set
+type contentMap map[*replicationElement]string
 
 type replicationLayer struct {
 	dfs  *Dfs
@@ -33,50 +37,81 @@ type replicationLayer struct {
 
 //initalisation
 func newReplicationLayer() *replicationLayer {
-	el := replicationElement{name: "root",
+	el := replicationElement{name: "/",
 		elementType: "dir"}
-	s := []*replicationElement{&el}
-
-	dic := make(map[string]string)
-	dic[el.name] = ""
+	// s := []*replicationElement{&el}
+	s := set.New()
+	s.Add(el)
+	dic := make(map[*replicationElement]string)
+	dic[&el] = ""
 
 	l := replicationLayer{
+		dfs:  new(Dfs),
 		set:  s,
 		cmap: dic,
 	}
 
 	return &l
 }
-func (l replicationLayer) setDfs(dfs *Dfs) {
+func (l *replicationLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
 }
 
 //update inteface
 
-func (l replicationLayer) add(path string, typ string) {
+func (l *replicationLayer) add(path string, typ string) {
 	el := replicationElement{name: path, elementType: typ}
-	l.set = append(l.set, &el)
-	l.cmap[el.name] = "" //initate with an empty content
+	// l.set = append(l.set, &el)
+	(*l.set).Add(el) //element get added
+	l.cmap[&el] = "" //initate with an empty content
 	l.updateDfs()
+	fmt.Println("added", path)
 }
 
-func (l replicationLayer) remove(path string, typ string) {
+func (l *replicationLayer) remove(path string, typ string) {
 	//remove an element from the slice
-	temp := []*replicationElement{}
-	for _, i := range l.set {
-		if !(i.name == path && i.elementType == typ) {
-			temp = append(temp, i)
+	// temp := set.New()
+	for _, i := range (*l.set).Values() {
+		ii := i.(replicationElement)
+		if (ii.name == path && ii.elementType == typ) {
+			(*l.set).Remove(ii)
 		}
-		fmt.Println(i)
 	}
-	l.set = temp
+	// l.set = temp
+	// fmt.Println((*l.set).Size(), temp.Size())
+	l.updateDfs()
+	fmt.Println("removed", path)
 }
 
-// func (l replicationLayer) udpate(path string,typ string){
+// func (l *replicationLayer) udpate(path string,typ string){
 // 	fmt.Println("element has been added")
 // }
 
 //update hier by through dfs
-func (l replicationLayer) updateDfs() {
-	l.dfs.updateHier(l.cmap) //select only one the exist in the setS
+func (l *replicationLayer) updateDfs() {
+
+	l.dfs.updateHier(l.returnCurrentSet()) //select only one the exist in the setS
+}
+
+func (l *replicationLayer) returnCurrentSet() map[*replicationElement]string {
+	temp := make(map[*replicationElement]string)
+	for _, k := range (*l.set).Values() {
+		kk := (k.(replicationElement))
+		temp[&kk] = l.cmap[&kk]
+	}
+	return temp
+}
+
+func (l *replicationLayer) printCurrentState() {
+	fmt.Println("\nCRDT_Set\n-------------")
+	// for _, k := range l.set {
+	// 	v := l.cmap[k]
+	// 	fmt.Println("", k.name, "content", v)
+	// }
+	for _, k := range (*l.set).Values() {
+		kk := (k.(replicationElement))
+		v := l.cmap[&kk]
+		fmt.Println("", kk.name, "content", v)
+	}
+	fmt.Println()
 }

@@ -1,9 +1,11 @@
 package main
 
 import (
-	//"fmt"
+	// "fmt"
 	"fmt"
 	"strings"
+
+	lls "github.com/emirpasic/gods/stacks/linkedliststack"
 )
 
 /*
@@ -33,11 +35,21 @@ type DfsTreeElement struct {
 	fileType string
 	path     string
 	content  string
-	children children
+	children []*DfsTreeElement
+}
+
+func (d DfsTreeElement) getPath() string {
+	if d.name == "/" {
+		return d.name
+	}
+	if d.fileType == "dir" {
+		return d.path+d.name + "/"
+	}
+	return d.path + d.name
 }
 
 //slice  referring to children nodes
-type children []DfsTreeElement
+type children []*DfsTreeElement
 
 //store the root
 type DfsTree DfsTreeElement
@@ -51,7 +63,7 @@ type hierLayer struct {
 
 //initalisation
 func newhierLayer() *hierLayer {
-	ro := DfsTreeElement{name: "root", fileType: "dir", path: "", content: ""}
+	ro := DfsTreeElement{name: "/", fileType: "dir", path: "", content: ""}
 
 	l := hierLayer{root: &ro,
 		contentMap: make(map[string]string),
@@ -60,19 +72,19 @@ func newhierLayer() *hierLayer {
 	return &l
 }
 
-func (l hierLayer) setDfs(dfs *Dfs) {
+func (l *hierLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
 }
 
 //Update Interface
 
 //add element
-func (l hierLayer) add(path string, name string, typ string) {
+func (l *hierLayer) add(path string, name string, typ string) {
 	l.dfs.UpdateAddReplication(path+"/"+name, typ)
 }
 
 //remove element
-func (l hierLayer) remove(path string, typ string) {
+func (l *hierLayer) remove(path string, typ string) {
 	l.dfs.UpdateRemoveReplication(path, typ)
 }
 
@@ -86,40 +98,88 @@ func updateReplation() {
 }
 
 //modify the state based on new info from replication
-func (l hierLayer) updateState(cmap map[string]string) {
+func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 	//go through the map and build the tree
-	fmt.Print()
-	// (Depth first)
-	// find the root , instantiate and add into stack
-	// ro := findRoot(cmap)
-	// //ignore type
-	// p,n:=pathAndName(ro)
-	// rootEl:=DfsTreeElement{name:n,fileType:"uf",path:p,children:[]DfsTreeElement{}}
-	// then add root to stack
-	// untill stack empty
-	// 	pop stack call el
-	// 	iterate throu children
-	// 		instantiate
-	// 		add reference to stack
-	// 		add reference to el children
+	l.root = &DfsTreeElement{name: "/", fileType: "dir", path: "", content: ""}
+	stack := lls.New()
 
-	//pass to interface
+	stack.Push(l.root)
+	// untill stack empty
+	for !stack.Empty() {
+		// 	pop stack call el
+		ra, _ := stack.Pop()
+		el := ra.(*DfsTreeElement)
+		// fmt.Printf("address of slice %p \n", &el.children)
+		//iterate throu children
+		// temp := DfsTreeElement{name: "folder", fileType: "dir", path: "/", content: ""}
+		// fmt.Println(getChildren(el.getPath(), cmap))
+		if el.fileType == "dir" {
+			for _, i := range getChildren(el.getPath(), cmap) {
+				ii := i
+				stack.Push(&ii)
+				el.children = append(el.children, &ii)
+			}
+			// fmt.Println(el.getPath(), el.children)
+
+		}
+
+	}
+
+	//last step is to send the interface layer with update state
+
 }
+
+//pass to interfac
 
 //return to interface
 //user interface will be looking it up
 
-//axulariy
-func findRoot(cmap map[string]string) string {
-	for k,_ :=range cmap{
-		if(!strings.Contains(k,"/")){
-			return k  //root found
+//axulariy functions
+func (l *hierLayer) printCurrentState() {
+	l.printElement(*l.root, 0)
+}
+
+func (l *hierLayer) printElement(root DfsTreeElement, nt int) {
+	for i := 0; i < nt; i++ {
+		fmt.Printf("\t") //print tabs
+	}
+	// fmt.Println(root.name)
+	val := (root.children)
+	isDir :=""
+	if(root.fileType=="dir"){
+		isDir="+"
+	}
+	fmt.Println(isDir+root.name)
+	for i := 0; i < len(val); i++ {
+		l.printElement(*val[i], nt+1)
+	}
+
+}
+
+func findRoot(cmap map[*replicationElement]string) string {
+	for k := range cmap {
+		if !strings.Contains(k.name, "/") {
+			return k.name //root found
 		}
 	}
 	return ""
 }
-func pathAndName(str string)(string,string) {
+func pathAndName(str string) (string, string) {
 	li := strings.LastIndex(str, "/")
-	return str[:li+1],str[li+1:]
+	return str[:li+1], str[li+1:]
 }
+func getChildren(path string, cmap map[*replicationElement]string) []DfsTreeElement {
+	temp := []DfsTreeElement{}
+	for k := range cmap {
+		p, n := pathAndName(k.name)
+		if p == path && k.name != "/" {
+			el := DfsTreeElement{name: n,
+				fileType: k.elementType,
+				path:     p,
+				children: []*DfsTreeElement{}}
+			temp = append(temp, el)
+		}
 
+	}
+	return temp
+}
