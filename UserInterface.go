@@ -103,11 +103,16 @@ func (l *UserInterface) wait() {
 			}
 
 		} else if command == "mk" {
-
+			name:= words[1]
+			fileType:=words[2]
+			l.dfs.updateAddHier(currentDir.getPath(),name,fileType)
+			fmt.Println(currentDir.children,l.dfs.hier.root)
 		} else if command == "rm" {
-
+			// name:= words[1]
+			// fileType:=words[2]
+			// l.dfs.updateAddHier(currentDir.getPath(),name,fileType)
 		} else if command == "printFs" {
-
+			l.printDfs()
 		} else if command == "quit" {
 			fmt.Println("DFS is closed")
 			break
