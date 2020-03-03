@@ -35,6 +35,7 @@ type DfsTreeElement struct {
 	fileType string
 	path     string
 	content  string
+	parent 	 *DfsTreeElement
 	children []*DfsTreeElement
 }
 
@@ -63,7 +64,7 @@ type hierLayer struct {
 
 //initalisation
 func newhierLayer() *hierLayer {
-	ro := DfsTreeElement{name: "/", fileType: "dir", path: "", content: ""}
+	ro := DfsTreeElement{name: "/", fileType: "dir", path: "", content: "",parent:nil,}
 
 	l := hierLayer{root: &ro,
 		contentMap: make(map[string]string),
@@ -100,7 +101,7 @@ func updateReplation() {
 //modify the state based on new info from replication
 func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 	//go through the map and build the tree
-	l.root = &DfsTreeElement{name: "/", fileType: "dir", path: "", content: ""}
+	l.root = &DfsTreeElement{name: "/", fileType: "dir", path: "", content: "",parent:nil,}
 	stack := lls.New()
 
 	stack.Push(l.root)
@@ -109,12 +110,9 @@ func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 		// 	pop stack call el
 		ra, _ := stack.Pop()
 		el := ra.(*DfsTreeElement)
-		// fmt.Printf("address of slice %p \n", &el.children)
-		//iterate throu children
-		// temp := DfsTreeElement{name: "folder", fileType: "dir", path: "/", content: ""}
-		// fmt.Println(getChildren(el.getPath(), cmap))
+
 		if el.fileType == "dir" {
-			for _, i := range getChildren(el.getPath(), cmap) {
+			for _, i := range getChildren(el, cmap) {
 				ii := i
 				stack.Push(&ii)
 				el.children = append(el.children, &ii)
@@ -172,7 +170,8 @@ func pathAndName(str string) (string, string) {
 	li := strings.LastIndex(str, "/")
 	return str[:li+1], str[li+1:]
 }
-func getChildren(path string, cmap map[*replicationElement]string) []DfsTreeElement {
+func getChildren(root *DfsTreeElement, cmap map[*replicationElement]string) []DfsTreeElement {
+	path:=root.getPath()
 	temp := []DfsTreeElement{}
 	for k := range cmap {
 		p, n := pathAndName(k.name)
@@ -180,7 +179,9 @@ func getChildren(path string, cmap map[*replicationElement]string) []DfsTreeElem
 			el := DfsTreeElement{name: n,
 				fileType: k.elementType,
 				path:     p,
-				children: []*DfsTreeElement{}}
+				children: []*DfsTreeElement{},
+				parent: root,
+			}
 			temp = append(temp, el)
 		}
 

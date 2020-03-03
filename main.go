@@ -1,8 +1,13 @@
 package main
 
-import (
+// import (
+// 		"os"
+// 		"fmt"
+// 		"strings"
+// 		"bufio"
+// 	)
 
-)
+
 type person struct {
 	name string
 	age  *int
@@ -36,6 +41,7 @@ func main() {
 
 	*/
 
+	
 	dfs := newDfs()
 	dfs.start()
 	dfs.updateAddHier("/", "1st", "txt")
@@ -47,9 +53,11 @@ func main() {
 	dfs.updateAddHier("/folder/", "folder2", "dir")
 	dfs.updateAddHier("/folder/folder2/", "rand", "txt")
 
-
 	dfs.updateRemoveHier("/1st","txt")
 
+
+
+	dfs.ui.wait()
 	// dfs.updateAddHier("/", "1st", "txt")
 
 	// a:=new(*int)
@@ -59,9 +67,6 @@ func main() {
 	// fmt.Println(a)
 	// st.Push(a)
 	// fmt.Println(st.Pop())
-
-	
-
 
 	// reader := bufio.NewReader(os.Stdin)
 	// fmt.Println("Simple Shell")
