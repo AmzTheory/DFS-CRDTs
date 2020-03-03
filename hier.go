@@ -126,10 +126,14 @@ func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 	}
 
 	//last step is to send the interface layer with update state
+	l.updateInterface()
 
 }
 
 //pass to interfac
+func (l *hierLayer) updateInterface(){
+	 l.dfs.updateInterface(l.root)
+}
 
 //return to interface
 //user interface will be looking it up

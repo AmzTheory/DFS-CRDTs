@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
-)
+		"fmt"
+		"github.com/disiqueira/gotree"
+		)
 
 /*
 
@@ -17,18 +18,40 @@ import (
 
 
 */
-type interfaceLayer struct {
+type UserInterface struct {
 	root *DfsTreeElement
+	dfs  *Dfs
 }
 
-func newUserInteface(root *DfsTreeElement) {
-	fmt.Println("Ahmed")
+func newUserInteface(r *DfsTreeElement, d *Dfs) *UserInterface {
+	return &UserInterface{root: r, dfs: d}
 }
 
-func (l interfaceLayer) printDfs() {
-
+func (l UserInterface) printDfs() {
+	dfsTree:=gotree.New(format(*l.root))
+	printDfsHelper(&dfsTree, l.root.children)
+	fmt.Println(dfsTree.Print())
+}
+func printDfsHelper(root *gotree.Tree,children []*DfsTreeElement){
+	for _, i := range children {
+		subTree:=(*root).Add(format(*i))
+		if(len(i.children)!=0){
+			printDfsHelper(&subTree,i.children)
+		}
+	}
 }
 
-func (l *interfaceLayer) wait() {
 
+func (l *UserInterface) wait() {
+
+}
+func (l *UserInterface) updateState(root *DfsTreeElement){
+	l.root=root
+	l.printDfs()
+}
+func format(el DfsTreeElement) string {
+	if(el.fileType=="dir"){
+		return el.name
+	}
+	return el.name+"."+el.fileType
 }

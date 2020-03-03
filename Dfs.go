@@ -19,6 +19,7 @@ package main
 */
 
 type Dfs struct {
+	ui  *UserInterface
 	hier *hierLayer
 	rep  *replicationLayer
 }
@@ -33,9 +34,9 @@ func (d *Dfs) printInstanceRef() {
 func (d *Dfs) start() {
 	d.rep.setDfs(d)
 	d.hier.setDfs(d)
+	d.ui=newUserInteface(d.hier.root,d)
 
-	//add root
-	//pass it to to interface
+	d.ui.printDfs()
 
 }
 
@@ -45,7 +46,9 @@ func (d *Dfs) start() {
 func (d *Dfs) updateAddHier(path string, n string, typ string) {
 	d.UpdateAddReplication(path+n, typ)
 }
-func (d *Dfs) updateRemoveHier(path string, typ string) {}
+func (d *Dfs) updateRemoveHier(path string, typ string) {
+	d.UpdateRemoveReplication(path,typ)
+}
 
 //update
 
@@ -65,4 +68,6 @@ func (d *Dfs) updateHier(cmap map[*replicationElement]string) {
 	d.hier.updateState(cmap) //infor hier layer
 }
 
-// func (d Dfs) updateInterface(tree DfsTree) {}
+func (d *Dfs) updateInterface(root *DfsTreeElement) {
+	d.ui.updateState(root)
+}
