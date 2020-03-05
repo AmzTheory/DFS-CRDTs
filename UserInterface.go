@@ -109,6 +109,11 @@ func (l *UserInterface) wait() {
 
 			name := words[1]
 			fileType := words[2]
+			if(exists(currentDir,name,fileType)){
+				fmt.Println("\t"+name +" does exist at the current directory!")
+				continue;
+			}
+
 			l.dfs.updateAddHier(currentDir.getPath(), name, fileType)
 			currentDir = l.updateNodePointer(currentDir.getPath())
 			// if(temp!=)
@@ -120,6 +125,11 @@ func (l *UserInterface) wait() {
 			}
 			name := words[1]
 			fileType := words[2]
+			if(!exists(currentDir,name,fileType)){
+				fmt.Println("\t"+name +" does not exist at the current directory!")
+				continue
+			}
+
 			l.dfs.updateRemoveHier(currentDir.getPath()+name, fileType)
 			currentDir = l.updateNodePointer(currentDir.getPath())
 		} else if command == "printfs" {
@@ -166,6 +176,18 @@ func findNode(root *DfsTreeElement, dir string) *DfsTreeElement {
 		}
 	}
 	return nil
+}
+
+//TODO: expand to go deeper in the tree
+func exists(root *DfsTreeElement,path ,fileType string) bool{
+	var el DfsTreeElement 
+	for i:=0;i<len(root.children);i++{
+		el=*root.children[i]
+		if el.name==path && el.fileType==fileType{
+			return true
+		}
+	}
+	return false
 }
 func format(el DfsTreeElement) string {
 	if el.fileType == "dir" {
