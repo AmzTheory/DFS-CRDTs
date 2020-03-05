@@ -103,7 +103,7 @@ func (l *UserInterface) wait() {
 
 		} else if command == "mk" {
 			if len(words) != 3 {
-				fmt.Println("mk is defined as : mk  name fileType")
+				fmt.Println("\tmk is defined as : mk  name fileType")
 				continue
 			}
 
@@ -114,7 +114,11 @@ func (l *UserInterface) wait() {
 			// if(temp!=)
 
 		} else if command == "rm" {
-			name:=words[1]
+			if len(words) != 3 {
+				fmt.Println("\trm is defined as : rm  name fileType")
+				continue
+			}
+			name := words[1]
 			fileType := words[2]
 			l.dfs.updateRemoveHier(currentDir.getPath()+name, fileType)
 			currentDir = l.updateNodePointer(currentDir.getPath())
