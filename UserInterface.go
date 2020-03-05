@@ -95,7 +95,6 @@ func (l *UserInterface) wait() {
 					currentDir = &el
 					found = true
 				}
-
 			}
 
 			if !found {
@@ -103,16 +102,31 @@ func (l *UserInterface) wait() {
 			}
 
 		} else if command == "mk" {
-			name:= words[1]
-			fileType:=words[2]
-			l.dfs.updateAddHier(currentDir.getPath(),name,fileType)
-			fmt.Println(currentDir.children,l.dfs.hier.root)
+			if len(words) != 3 {
+				fmt.Println("mk is defined as : mk  name fileType")
+				continue
+			}
+
+			name := words[1]
+			fileType := words[2]
+			l.dfs.updateAddHier(currentDir.getPath(), name, fileType)
+			currentDir = l.updateNodePointer(currentDir.getPath())
+			// if(temp!=)
+
 		} else if command == "rm" {
-			// name:= words[1]
-			// fileType:=words[2]
-			// l.dfs.updateAddHier(currentDir.getPath(),name,fileType)
-		} else if command == "printFs" {
+			name:=words[1]
+			fileType := words[2]
+			l.dfs.updateRemoveHier(currentDir.getPath()+name, fileType)
+			currentDir = l.updateNodePointer(currentDir.getPath())
+		} else if command == "printfs" {
 			l.printDfs()
+		} else if command == "help" {
+			fmt.Println("\tcd      change current Directory\tcd dir")
+			fmt.Println("\tls      show files in current directory\tls")
+			fmt.Println("\tmk      create new file/directory\tmk name filetype")
+			fmt.Println("\trm  	   remove file/directory\trm name filetype")
+			fmt.Println("\tprintfs print the file system tree")
+			fmt.Println("\tquit    quit the file system (go offline) quit")
 		} else if command == "quit" {
 			fmt.Println("DFS is closed")
 			break
@@ -125,6 +139,29 @@ func (l *UserInterface) wait() {
 func (l *UserInterface) updateState(root *DfsTreeElement) {
 	l.root = root
 	//l.printDfs()
+}
+func (l *UserInterface) updateNodePointer(path string) *DfsTreeElement {
+	r := l.root
+	dirs := strings.Split(path[1:], "/")
+
+	if path == "/" {
+		return r // TODO: improve the current method
+	}
+
+	for i := 0; i < len(dirs)-1; i++ {
+		fmt.Println(r.name)
+		r = findNode(r, dirs[i])
+	}
+	return r
+
+}
+func findNode(root *DfsTreeElement, dir string) *DfsTreeElement {
+	for i := 0; i < len(root.children); i++ {
+		if root.children[i].name == dir {
+			return root.children[i]
+		}
+	}
+	return nil
 }
 func format(el DfsTreeElement) string {
 	if el.fileType == "dir" {
