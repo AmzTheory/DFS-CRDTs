@@ -35,6 +35,8 @@ type replicationLayer struct {
 	cmap contentMap
 }
 
+
+
 //initalisation
 func newReplicationLayer() *replicationLayer {
 	el := replicationElement{name: "/",
@@ -57,6 +59,21 @@ func (l *replicationLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
 }
 
+func (l *replicationLayer) runLocally(send chan map[*replicationElement]string,recieve chan HierToRep){
+	send<-l.returnCurrentSet() //send the initial state
+	for{
+		msg:=<-recieve
+		if(msg.op=="add"){
+			l.add(msg.path,msg.fileType)
+		}else if(msg.op=="rm"){
+			l.remove(msg.path,msg.fileType)
+		}
+
+		send<-l.returnCurrentSet() //send the updated set to hier
+	}
+}
+
+
 //update inteface
 
 func (l *replicationLayer) add(path string, typ string) {
@@ -64,7 +81,7 @@ func (l *replicationLayer) add(path string, typ string) {
 	// l.set = append(l.set, &el)
 	(*l.set).Add(el) //element get added
 	l.cmap[&el] = "" //initate with an empty content
-	l.updateDfs()
+	// l.updateDfs()
 	fmt.Println("added", path)
 }
 
@@ -79,7 +96,7 @@ func (l *replicationLayer) remove(path string, typ string) {
 	}
 	// l.set = temp
 	// fmt.Println((*l.set).Size(), temp.Size())
-	l.updateDfs()
+	// l.updateDfs()
 	fmt.Println("removed", path)
 }
 

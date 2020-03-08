@@ -44,7 +44,7 @@ func printDfsHelper(root *gotree.Tree, children []*DfsTreeElement) {
 	}
 }
 
-func (l *UserInterface) wait() {
+func (l *UserInterface) run(send chan UiToHier,recieve chan *DfsTreeElement) {
 	/**
 	cd  change current Directory
 	ls  show files in current directory
@@ -54,7 +54,7 @@ func (l *UserInterface) wait() {
 	quit   close the program(go offline)
 	*/
 
-	currentDir := l.root
+	currentDir := <-recieve  //recieve the inital config
 	reader := bufio.NewReader(os.Stdin)
 
 	//infinite loop
@@ -113,9 +113,16 @@ func (l *UserInterface) wait() {
 				continue;
 			}
 
-			l.dfs.updateAddHier(currentDir.getPath(), name, fileType)
+			// l.dfs.updateAddHier(currentDir.getPath(), name, fileType)
+			send<-UiToHier{
+							path:currentDir.getPath(),
+							name:name,
+							fileType: fileType,
+							op:"add",
+						}
+			//wait for an update			
+			l.root=<-recieve
 			currentDir = l.updateNodePointer(currentDir.getPath())
-			// if(temp!=)
 
 		} else if command == "rm" {
 			if len(words) != 3 {
@@ -129,7 +136,19 @@ func (l *UserInterface) wait() {
 				continue
 			}
 
-			l.dfs.updateRemoveHier(currentDir.getPath()+name, fileType)
+
+			// l.dfs.updateRemoveHier(currentDir.getPath()+name, fileType)
+			send<-UiToHier{
+							path:currentDir.getPath()+name,
+							name:"",
+							fileType: fileType,
+							op:"rm",
+						}
+			//wait for an update			
+			l.root=<-recieve
+			currentDir = l.updateNodePointer(currentDir.getPath())
+			
+			
 			currentDir = l.updateNodePointer(currentDir.getPath())
 		} else if command == "printfs" {
 			l.printDfs()
@@ -142,6 +161,8 @@ func (l *UserInterface) wait() {
 			fmt.Println("\tquit    quit the file system (go offline) quit")
 		} else if command == "quit" {
 			fmt.Println("DFS is closed")
+			l.dfs.closeAll()
+			//close the Dfs instance
 			break
 		} else {
 			fmt.Println("->" + command + " Unknown command")

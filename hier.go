@@ -104,6 +104,9 @@ func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 	l.root = &DfsTreeElement{name: "/", fileType: "dir", path: "", content: "",parent:nil,}
 	stack := lls.New()
 
+
+	//policy used here is skip
+
 	stack.Push(l.root)
 	// untill stack empty
 	for !stack.Empty() {
@@ -127,6 +130,12 @@ func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 	l.updateInterface()
 
 }
+
+
+func (l *hierLayer) reappear() {
+	//request the content of reappear filed from the replication
+}
+
 
 //pass to interfac
 func (l *hierLayer) updateInterface(){
@@ -157,6 +166,35 @@ func (l *hierLayer) printElement(root DfsTreeElement, nt int) {
 	}
 
 }
+
+
+func (l *hierLayer) runDown(ui chan UiToHier,rep chan HierToRep){
+
+	for{ 
+		msgu := <- ui //receiving from ui layer 
+		msgR :=HierToRep{
+						path: msgu.path+msgu.name, 
+						fileType: msgu.fileType, 
+						op:      msgu.op,
+					}
+
+
+		rep <-msgR  //sending message to replication layer
+	}
+}
+func (l* hierLayer) runUp(rep chan map[*replicationElement]string ,ui chan *DfsTreeElement){
+	for{
+		msgr:=<-rep
+		//apply the policies
+		l.updateState(msgr)
+		ui <-l.root //send the root to ui
+	}
+}
+
+func skip(map[*replicationElement]string){
+	//iterate thro
+}
+
 
 func findRoot(cmap map[*replicationElement]string) string {
 	for k := range cmap {

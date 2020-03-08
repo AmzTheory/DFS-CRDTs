@@ -24,10 +24,58 @@ type Dfs struct {
 	rep  *replicationLayer
 }
 
+
+//messages type
+type UiToHier struct{
+	path 	 string
+	name 	 string
+	fileType string
+	op 	 	 string
+}
+
+type HierToRep struct{
+	path 	 string
+	fileType string
+	op 		 string
+}
+
+var on bool
+
+
 func newDfs() *Dfs {
+	
 	d := Dfs{hier: newhierLayer(), rep: newReplicationLayer()}
 	return &d
 }
+
+
+
+func(d *Dfs) runAll(){
+	on=true
+	
+	
+	//channels
+	uiTohier:=make(chan UiToHier)
+	hierTorep:=make(chan HierToRep)
+
+	repTohier:=make(chan map[*replicationElement]string)
+	hierToui:=make(chan *DfsTreeElement)
+
+
+	//go routines
+
+	go d.ui.run(uiTohier,hierToui) //run ui
+	go d.hier.runDown(uiTohier,hierTorep) //run hier  top->down 
+	go d.hier.runUp(repTohier,hierToui)   //run hier  down -> top
+	go d.rep.runLocally(repTohier,hierTorep) //run rep local thread
+
+	//Wait for ever
+	for on{
+		//break when DFS closed  
+	}
+
+}
+
 func (d *Dfs) printInstanceRef() {
 	//	fmt.Println("calling reference",&d)
 }
@@ -70,4 +118,7 @@ func (d *Dfs) updateHier(cmap map[*replicationElement]string) {
 
 func (d *Dfs) updateInterface(root *DfsTreeElement) {
 	d.ui.updateState(root)
+}
+func(d *Dfs) closeAll(){
+	on=false
 }
