@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-
+	"database/sql"
 	set "github.com/emirpasic/gods/sets/linkedhashset"
 )
 
@@ -39,13 +39,14 @@ type replicationLayer struct {
 
 //initalisation
 func newReplicationLayer() *replicationLayer {
-	el := replicationElement{name: "/",
-		elementType: "dir"}
-	// s := []*replicationElement{&el}
-	s := set.New()
-	s.Add(el)
-	dic := make(map[*replicationElement]string)
-	dic[&el] = ""
+	
+	
+	s,dic:=readDB()
+	
+	// s := set.New()
+	// s.Add(el)
+	// dic := make(map[*replicationElement]string)
+	// dic[&el] = ""
 
 	l := replicationLayer{
 		dfs:  new(Dfs),
@@ -131,4 +132,53 @@ func (l *replicationLayer) printCurrentState() {
 		fmt.Println("", kk.name, "content", v)
 	}
 	fmt.Println()
+}
+
+
+
+//read the databse
+func readDB() (*set.Set,contentMap){
+	s:=set.New()
+	contentMap:=make(map[*replicationElement]string)
+	
+	
+	database, _ := sql.Open("sqlite3", "./data.db")
+    rows, _ := database.Query("SELECT path,type,content,user from data")
+    var path string
+    var elementType string
+	var content string
+	var used int
+    for rows.Next() {
+        rows.Scan(&path, &elementType, &content,&used)
+		el:=replicationElement{name:path,elementType:elementType,}
+		contentMap[&el]=content
+		if(used==1){
+			s.Add(el)
+		}
+	
+	}
+	
+	return s,contentMap
+}
+
+func (l* replicationLayer) writeDB(){
+	database, _ := sql.Open("sqlite3", "./data.db")
+	//dropping the table
+    statement, _ := database.Prepare("Drop table data");
+	statement.Exec()
+	//creating data table
+    statement, _ = database.Prepare("create table data (id INTEGER PRIMARY KEY, path TEXT ,type TEXT ,content TEXT,used INTEGER)")
+	statement.Exec()
+	
+	statement, _ = database.Prepare("INSERT INTO people (path, type, content, used) VALUES (?, ?,?,?)")
+
+
+	//insert data points
+	for k, v := range l.cmap {
+		used:=0
+		if (*l.set).Contains(k){
+			used=1
+		}
+		statement.Exec(k.name,k.elementType,v,used)
+    }
 }

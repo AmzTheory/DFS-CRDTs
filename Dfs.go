@@ -71,7 +71,8 @@ func(d *Dfs) runAll(){
 
 	//Wait for ever
 	for on{
-		//break when DFS closed  
+		//break when DFS closed 
+		d.rep.writeDB() 
 	}
 
 }
