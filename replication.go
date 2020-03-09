@@ -1,9 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"database/sql"
+	"fmt"
+
 	set "github.com/emirpasic/gods/sets/linkedhashset"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 /*
@@ -18,6 +20,9 @@ functions
 returns to upper layer
 	MAP   (p,t)->String (content)
 */
+
+var dbPath string
+var data string
 
 //Structs and type
 type replicationElement struct {
@@ -35,14 +40,12 @@ type replicationLayer struct {
 	cmap contentMap
 }
 
-
-
 //initalisation
 func newReplicationLayer() *replicationLayer {
-	
-	
-	s,dic:=readDB()
-	
+	dbPath = "./src/DFS/data.db"
+	data = "data"
+	s, dic := readDB()
+
 	// s := set.New()
 	// s.Add(el)
 	// dic := make(map[*replicationElement]string)
@@ -60,20 +63,19 @@ func (l *replicationLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
 }
 
-func (l *replicationLayer) runLocally(send chan map[*replicationElement]string,recieve chan HierToRep){
-	send<-l.returnCurrentSet() //send the initial state
-	for{
-		msg:=<-recieve
-		if(msg.op=="add"){
-			l.add(msg.path,msg.fileType)
-		}else if(msg.op=="rm"){
-			l.remove(msg.path,msg.fileType)
+func (l *replicationLayer) runLocally(send chan map[*replicationElement]string, recieve chan HierToRep) {
+	send <- l.returnCurrentSet() //send the initial state
+	for {
+		msg := <-recieve
+		if msg.op == "add" {
+			l.add(msg.path, msg.fileType)
+		} else if msg.op == "rm" {
+			l.remove(msg.path, msg.fileType)
 		}
 
-		send<-l.returnCurrentSet() //send the updated set to hier
+		send <- l.returnCurrentSet() //send the updated set to hier
 	}
 }
-
 
 //update inteface
 
@@ -91,7 +93,7 @@ func (l *replicationLayer) remove(path string, typ string) {
 	// temp := set.New()
 	for _, i := range (*l.set).Values() {
 		ii := i.(replicationElement)
-		if (ii.name == path && ii.elementType == typ) {
+		if ii.name == path && ii.elementType == typ {
 			(*l.set).Remove(ii)
 		}
 	}
@@ -134,51 +136,58 @@ func (l *replicationLayer) printCurrentState() {
 	fmt.Println()
 }
 
-
-
 //read the databse
-func readDB() (*set.Set,contentMap){
-	s:=set.New()
-	contentMap:=make(map[*replicationElement]string)
-	
-	
-	database, _ := sql.Open("sqlite3", "./data.db")
-    rows, _ := database.Query("SELECT path,type,content,user from data")
-    var path string
-    var elementType string
+func readDB() (*set.Set, contentMap) {
+	s := set.New()
+	contentMap := make(map[*replicationElement]string)
+
+	database, err := sql.Open("sqlite3", dbPath)
+	checkErr(err)
+	rows, err := database.Query("SELECT path,type,content,used from " + data)
+	checkErr(err)
+	var path string
+	var elementType string
 	var content string
 	var used int
-    for rows.Next() {
-        rows.Scan(&path, &elementType, &content,&used)
-		el:=replicationElement{name:path,elementType:elementType,}
-		contentMap[&el]=content
-		if(used==1){
+	for rows.Next() {
+		rows.Scan(&path, &elementType, &content, &used)
+		el := replicationElement{name: path, elementType: elementType}
+		contentMap[&el] = content
+		if used == 1 {
 			s.Add(el)
 		}
-	
+
 	}
-	
-	return s,contentMap
+	rows.Close()
+	return s, contentMap
 }
 
-func (l* replicationLayer) writeDB(){
-	database, _ := sql.Open("sqlite3", "./data.db")
+func (l *replicationLayer) writeDB() {
+	database, _ := sql.Open("sqlite3", dbPath)
 	//dropping the table
-    statement, _ := database.Prepare("Drop table data");
+	statement, err := database.Prepare("Drop table " + data)
 	statement.Exec()
+	checkErr(err)
 	//creating data table
-    statement, _ = database.Prepare("create table data (id INTEGER PRIMARY KEY, path TEXT ,type TEXT ,content TEXT,used INTEGER)")
+	statement, err = database.Prepare("create table " + data + " (id INTEGER PRIMARY KEY, path TEXT ,type TEXT ,content TEXT,used INTEGER)")
 	statement.Exec()
-	
-	statement, _ = database.Prepare("INSERT INTO people (path, type, content, used) VALUES (?, ?,?,?)")
 
+	statement, err = database.Prepare("INSERT INTO " + data + " (path, type,content,used) VALUES (?,?,?,?)")
 
 	//insert data points
 	for k, v := range l.cmap {
-		used:=0
-		if (*l.set).Contains(k){
-			used=1
+		used := 0
+		if (*l.set).Contains(*k) {
+			used = 1
 		}
-		statement.Exec(k.name,k.elementType,v,used)
-    }
+		checkErr(err)
+		statement.Exec(k.name, k.elementType, v, used)
+
+	}
+}
+
+func checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
