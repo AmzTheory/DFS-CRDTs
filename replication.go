@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-
+	"strconv"
 	set "github.com/emirpasic/gods/sets/linkedhashset"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -40,11 +40,12 @@ type replicationLayer struct {
 	cmap contentMap
 }
 
+
 //initalisation
-func newReplicationLayer() *replicationLayer {
+func newReplicationLayer(id int) *replicationLayer {
 	dbPath = "./src/DFS/data.db"
 	data = "data"
-	s, dic := readDB()
+	s, dic := readDB(id)
 
 	// s := set.New()
 	// s.Add(el)
@@ -137,13 +138,14 @@ func (l *replicationLayer) printCurrentState() {
 }
 
 //read the databse
-func readDB() (*set.Set, contentMap) {
+func readDB(id int) (*set.Set, contentMap) {
 	s := set.New()
 	contentMap := make(map[*replicationElement]string)
 
 	database, err := sql.Open("sqlite3", dbPath)
 	checkErr(err)
-	rows, err := database.Query("SELECT path,type,content,used from " + data)
+
+	rows, err := database.Query("SELECT path,type,content,used from " + data+ " where dfsId="+strconv.Itoa(id))
 	checkErr(err)
 	var path string
 	var elementType string
@@ -164,15 +166,16 @@ func readDB() (*set.Set, contentMap) {
 
 func (l *replicationLayer) writeDB() {
 	database, _ := sql.Open("sqlite3", dbPath)
-	//dropping the table
-	statement, err := database.Prepare("Drop table " + data)
+	//delete dfs records
+	id:=(*l.dfs).id
+	statement, err := database.Prepare("delete from " + data+ " where dfsID="+strconv.Itoa(id))
 	statement.Exec()
 	checkErr(err)
-	//creating data table
-	statement, err = database.Prepare("create table " + data + " (id INTEGER PRIMARY KEY, path TEXT ,type TEXT ,content TEXT,used INTEGER)")
-	statement.Exec()
+	// //creating data table
+	// statement, err = database.Prepare("create table " + data + " (id INTEGER PRIMARY KEY, path TEXT ,type TEXT ,content TEXT,used INTEGER,dfsID Integer)")
+	// statement.Exec()
 
-	statement, err = database.Prepare("INSERT INTO " + data + " (path, type,content,used) VALUES (?,?,?,?)")
+	statement, err = database.Prepare("INSERT INTO " + data + " (path, type,content,used,dfsID) VALUES (?,?,?,?,?)")
 
 	//insert data points
 	for k, v := range l.cmap {
@@ -181,7 +184,7 @@ func (l *replicationLayer) writeDB() {
 			used = 1
 		}
 		checkErr(err)
-		statement.Exec(k.name, k.elementType, v, used)
+		statement.Exec(k.name, k.elementType, v, used,l.dfs.id)
 
 	}
 }

@@ -19,6 +19,7 @@ package main
 */
 
 type Dfs struct {
+	id int
 	ui  *UserInterface
 	hier *hierLayer
 	rep  *replicationLayer
@@ -42,9 +43,9 @@ type HierToRep struct{
 var on bool
 
 
-func newDfs() *Dfs {
+func newDfs(id int) *Dfs {
 	
-	d := Dfs{hier: newhierLayer(), rep: newReplicationLayer()}
+	d := Dfs{id:id,hier: newhierLayer(), rep: newReplicationLayer(id)}
 	return &d
 }
 
