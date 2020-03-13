@@ -1,6 +1,10 @@
 package main
 
-// import "fmt"
+import (
+		"fmt"
+		set "github.com/emirpasic/gods/sets/linkedhashset"			
+		"strconv"
+	)
 
 // "fmt"
 
@@ -40,6 +44,24 @@ type HierToRep struct{
 	op 		 string
 }
 
+type ClientManager struct {
+	active     *set.Set
+	offline    *set.Set
+    broadcast  chan RemoteMsg
+    register   chan *Client
+    unregister chan *Client
+}
+
+type Client struct {
+	id 	   int
+    socket net.Conn
+    data   chan []RemoteMsg
+}
+type RemoteMsg struct{
+	clientId	int
+	msg			string
+}
+
 var on bool
 
 
@@ -53,7 +75,6 @@ func newDfs(id int) *Dfs {
 
 func(d *Dfs) runAll(){
 	on=true
-	
 	
 	//channels
 	uiTohier:=make(chan UiToHier)
@@ -83,12 +104,13 @@ func (d *Dfs) printInstanceRef() {
 	//	fmt.Println("calling reference",&d)
 }
 func (d *Dfs) start() {
+
+
 	d.rep.setDfs(d)
 	d.hier.setDfs(d)
 	d.ui=newUserInteface(d.hier.root,d)
 
 	d.ui.printDfs()
-
 }
 
 //downwards

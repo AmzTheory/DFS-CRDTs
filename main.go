@@ -6,7 +6,7 @@ package main
 // 		"bufio"
 
 import (
-
+	
 )
 
 type person struct {
