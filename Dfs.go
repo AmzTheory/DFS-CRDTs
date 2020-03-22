@@ -1,10 +1,8 @@
 package main
 
 import (
-		"fmt"
-		set "github.com/emirpasic/gods/sets/linkedhashset"			
-		"strconv"
-	)
+	"log"
+)
 
 // "fmt"
 
@@ -23,92 +21,86 @@ import (
 */
 
 type Dfs struct {
-	id int
-	ui  *UserInterface
-	hier *hierLayer
-	rep  *replicationLayer
+	id      int
+	ui      *UserInterface
+	hier    *hierLayer
+	rep     *replicationLayer
+	manager *ClientManager
+	clients []int
 }
-
 
 //messages type
-type UiToHier struct{
-	path 	 string
-	name 	 string
+type UiToHier struct {
+	path     string
+	name     string
 	fileType string
-	op 	 	 string
+	op       string
 }
 
-type HierToRep struct{
-	path 	 string
+type HierToRep struct {
+	path     string
 	fileType string
-	op 		 string
-}
-
-type ClientManager struct {
-	active     *set.Set
-	offline    *set.Set
-    broadcast  chan RemoteMsg
-    register   chan *Client
-    unregister chan *Client
-}
-
-type Client struct {
-	id 	   int
-    socket net.Conn
-    data   chan []RemoteMsg
-}
-type RemoteMsg struct{
-	clientId	int
-	msg			string
+	op       string
 }
 
 var on bool
 
-
-func newDfs(id int) *Dfs {
-	
-	d := Dfs{id:id,hier: newhierLayer(), rep: newReplicationLayer(id)}
+func newDfs(id int, clients []int) *Dfs {
+	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id)}
 	return &d
 }
 
+func (d *Dfs) runAll(ch chan bool) {
+	on = true
 
-
-func(d *Dfs) runAll(){
-	on=true
-	
 	//channels
-	uiTohier:=make(chan UiToHier)
-	hierTorep:=make(chan HierToRep)
+	uiTohier := make(chan UiToHier)
+	hierTorep := make(chan HierToRep)
 
-	repTohier:=make(chan map[*replicationElement]string)
-	hierToui:=make(chan *DfsTreeElement)
-
+	repTohier := make(chan map[*replicationElement]string)
+	hierToui := make(chan *DfsTreeElement)
 
 	//go routines
+	go d.ui.run(uiTohier, hierToui)           //run ui
+	go d.hier.runDown(uiTohier, hierTorep)    //run hier  top->down
+	go d.hier.runUp(repTohier, hierToui)      //run hier  down -> top
+	go d.rep.runLocally(repTohier, hierTorep) //run rep local thread
 
-	go d.ui.run(uiTohier,hierToui) //run ui
-	go d.hier.runDown(uiTohier,hierTorep) //run hier  top->down 
-	go d.hier.runUp(repTohier,hierToui)   //run hier  down -> top
-	go d.rep.runLocally(repTohier,hierTorep) //run rep local thread
-
+	d.manager = newClient(d.id)
+	ch <- true
 	//Wait for ever
-	for on{
-		//break when DFS closed 
-		
-	}
-	d.rep.writeDB() 
+	for on {
+		//break when DFS closed
 
+	}
+
+	//get the data from DB
+	d.rep.writeDB()
+
+}
+func (d *Dfs) startConnecting() {
+	log.Println("logging")
+	d.manager.connectToClients(d)
+}
+
+//triggers to send remote operation to other clients
+func (d *Dfs) sendRemote(msg RemoteMsg) {
+	(d.manager.broadcast) <- RemoteMsg{ClientID:3,Msg:"MEssage"} 
+	//pass the message into the channel
+	log.Println("pass the message into broadcast channel")
+}
+func (d *Dfs) sendRemoteToRep(msg RemoteMsg) {
+	//locked
+	//do something
 }
 
 func (d *Dfs) printInstanceRef() {
 	//	fmt.Println("calling reference",&d)
 }
 func (d *Dfs) start() {
-
-
 	d.rep.setDfs(d)
 	d.hier.setDfs(d)
-	d.ui=newUserInteface(d.hier.root,d)
+	d.ui = newUserInteface(d.hier.root, d)
 
 	d.ui.printDfs()
 }
@@ -120,7 +112,7 @@ func (d *Dfs) updateAddHier(path string, n string, typ string) {
 	d.UpdateAddReplication(path+n, typ)
 }
 func (d *Dfs) updateRemoveHier(path string, typ string) {
-	d.UpdateRemoveReplication(path,typ)
+	d.UpdateRemoveReplication(path, typ)
 }
 
 //update
@@ -144,6 +136,6 @@ func (d *Dfs) updateHier(cmap map[*replicationElement]string) {
 func (d *Dfs) updateInterface(root *DfsTreeElement) {
 	d.ui.updateState(root)
 }
-func(d *Dfs) closeAll(){
-	on=false
+func (d *Dfs) closeAll() {
+	on = false
 }

@@ -187,7 +187,7 @@ func (l* hierLayer) runUp(rep chan map[*replicationElement]string ,ui chan *DfsT
 		msgr:=<-rep
 		//apply the policies
 		l.updateState(msgr)
-		ui <-l.root //send the root to ui
+		// ui <-l.root //send the root to ui
 	}
 }
 
