@@ -78,16 +78,16 @@ func (d *Dfs) runAll(ch chan bool) {
 	d.rep.writeDB()
 
 }
-func (d *Dfs) startConnecting() {
+func (d *Dfs) startConnecting(){
 	log.Println("logging")
 	d.manager.connectToClients(d)
 }
 
 //triggers to send remote operation to other clients
 func (d *Dfs) sendRemote(msg RemoteMsg) {
-	(d.manager.broadcast) <- RemoteMsg{ClientID:3,Msg:"MEssage"} 
-	//pass the message into the channel
 	log.Println("pass the message into broadcast channel")
+	(d.manager.broadcast) <- msg
+	//pass the message into the channel
 }
 func (d *Dfs) sendRemoteToRep(msg RemoteMsg) {
 	//locked

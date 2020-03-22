@@ -21,7 +21,7 @@ func main() {
 	d3  := newDfs(1003, []int{1001,1002})
 	// d3 := newDfs(1003, []int{1001, 1002})
 
-	msg := RemoteMsg{ClientID: 1, Msg: "This ahmed"}
+	msg := RemoteMsg{ClientID: 1, Msg: "This is Ahmed"}
 	ds := []*Dfs{d1, d2,d3}
 
 	//initate dfs and listener
@@ -40,10 +40,15 @@ func main() {
 		d.startConnecting()
 	}
 
-	// time.Sleep(3* time.Second)
-	//l
-	for true {
 
+	time.Sleep(3*time.Second)//wait for all connections
+	for _,d :=range ds{
+		d.sendRemote(msg)
+		time.Sleep(3*time.Second)//wait for message to be sent
 	}
+	//l
+	// for true {
+
+	// }
 
 }

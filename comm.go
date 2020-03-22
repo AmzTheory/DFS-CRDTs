@@ -66,14 +66,13 @@ func newClientManager(id int) *ClientManager {
 
 //wait for new clients
 func (manager *ClientManager) waitForConns(listener net.Listener) {
-	fmt.Printf("Listener on %d\n",manager.id)
-	for {
-
+// 	fmt.Printf("Listener on %d\n",manager.id)
+	
+	for i:=1;;i++ {
 		connection, _ := listener.Accept()
 		client := &Client{id: 0, socket: connection, data: make(chan []byte)}
-		fmt.Printf("%d accepts %d\n",manager.id,client.id)
+		// fmt.Printf("%d accepts %d\n",manager.id,client.id)
 		manager.register <- client
-		manager.active.Add(client)
 		//routines for aparticular client
 		// go manager.receive(client)
 		go manager.send(client)
@@ -82,19 +81,20 @@ func (manager *ClientManager) waitForConns(listener net.Listener) {
 
 func (manager *ClientManager) start() {
 	for {
+		// log.Printf("Still listening %d\n",manager.id)
 		select {
+		
 		case connection := <-manager.register:
 			manager.setClientOnline(connection)
-			// log.Println("Added new connection!")
 		case connection := <-manager.unregister:
 			manager.setClientOffline(connection)
 			log.Println("A connection has terminated!")
 		case message := <-manager.broadcast:
-			log.Println("broadcast triggered")
+			// log.Println("broadcast triggered")
 			msg := encodeRemoteMsg(message)
 			for _, conn := range manager.active.Values() {
 				con := conn.(*Client)
-				log.Println(message.Msg+" is being sent to "+strconv.Itoa(con.id))
+				// log.Println(message.Msg+" is being sent to "+strconv.Itoa(con.id))
 				select {
 				case con.data <- msg:
 				default:
@@ -160,14 +160,14 @@ func newClient(id int) *ClientManager {
 }
 func (manager *ClientManager) connectToClients(dfs *Dfs) {
 	for _, i := range dfs.clients {
-		fmt.Println("attempting " + strconv.Itoa(manager.id) + " connects to " + strconv.Itoa(i))
+		// fmt.Println("attempting " + strconv.Itoa(manager.id) + " connects to " + strconv.Itoa(i))
 		connection, error := net.Dial("tcp", "localhost:"+strconv.Itoa(i))
 		if error != nil {
 			fmt.Println(error)
 		}
-		fmt.Println("Connection achieved between " + strconv.Itoa(manager.id) + " and " + strconv.Itoa(i))
+		// fmt.Println("Connection achieved between " + strconv.Itoa(manager.id) + " and " + strconv.Itoa(i))
 
-		client := &Client{id: i, socket: connection, data: make(chan []byte)}
+		client := &Client{id: manager.id, socket: connection, data: make(chan []byte)}
 		go client.receive(dfs)
 	}
 }
