@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 )
 
 // "fmt"
@@ -60,12 +59,18 @@ func (d *Dfs) runAll(ch chan bool) {
 	repTohier := make(chan map[*replicationElement]string)
 	hierToui := make(chan *DfsTreeElement)
 
+	remToRep:=make(chan RemoteMsg)
+	execOp:=make(chan RemoteMsg)
+
 	//go routines
 	go d.ui.run(uiTohier, hierToui)           //run ui
 	go d.hier.runDown(uiTohier, hierTorep)    //run hier  top->down
 	go d.hier.runUp(repTohier, hierToui)      //run hier  down -> top
-	go d.rep.runLocally(repTohier, hierTorep) //run rep local thread
-
+	go d.rep.runLocally(execOp, hierTorep) //run rep local thread
+	go d.rep.runRemotely(execOp,remToRep)
+	go d.rep.pushUpState(repTohier,execOp)
+	
+	
 	d.manager = newClient(d.id)
 	ch <- true
 	//Wait for ever
@@ -79,19 +84,17 @@ func (d *Dfs) runAll(ch chan bool) {
 
 }
 func (d *Dfs) startConnecting(){
-	log.Println("logging")
 	d.manager.connectToClients(d)
 }
 
 //triggers to send remote operation to other clients
 func (d *Dfs) sendRemote(msg RemoteMsg) {
-	log.Println("pass the message into broadcast channel")
 	(d.manager.broadcast) <- msg
-	//pass the message into the channel
 }
-func (d *Dfs) sendRemoteToRep(msg RemoteMsg) {
+func (d *Dfs) sendRemoteToRep (msg RemoteMsg) {
 	//locked
-	//do something
+	
+	
 }
 
 func (d *Dfs) printInstanceRef() {

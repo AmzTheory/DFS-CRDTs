@@ -6,6 +6,7 @@ import (
 	"strconv"
 	set "github.com/emirpasic/gods/sets/linkedhashset"
 	_ "github.com/mattn/go-sqlite3"
+	"sync"
 )
 
 /*
@@ -38,6 +39,7 @@ type replicationLayer struct {
 	dfs  *Dfs
 	set  elementSet
 	cmap contentMap
+	opLock sync.Mutex
 }
 
 
@@ -64,23 +66,54 @@ func (l *replicationLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
 }
 
-func (l *replicationLayer) runLocally(send chan map[*replicationElement]string, recieve chan HierToRep) {
-	send <- l.returnCurrentSet() //send the initial state
+func (l *replicationLayer) runLocally(send chan RemoteMsg,recieve chan HierToRep) {
 	for {
 		msg := <-recieve
-		if msg.op == "add" {
-			l.add(msg.path, msg.fileType)
-		} else if msg.op == "rm" {
-			l.remove(msg.path, msg.fileType)
-		}
-
-		send <- l.returnCurrentSet() //send the updated set to hier
+		// if msg.op == "add" {
+		// 	l.add(msg.path, msg.fileType)
+		// } else if msg.op == "rm" {
+		// 	l.remove(msg.path, msg.fileType)
+		// }
+		rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
+		send <-rmsg
+		// send <- l.returnCurrentSet() //send the updated set to hier
 	}
 }
+
+//execute operation and update hier
+func(l *replicationLayer) pushUpState(send chan map[*replicationElement]string, recieve chan RemoteMsg){
+	send <- l.returnCurrentSet() //send the initial state
+	var opMsg RemoteMsg
+	var pa,ty string
+	for{//wait for operation to be executed local/remotely
+		opMsg=<-recieve
+		if(opMsg.Op=="add"){
+			pa=opMsg.Params[0]
+			ty=opMsg.Params[1]
+			l.add(pa,ty)
+		}else if(opMsg.Op=="rm"){
+			pa=opMsg.Params[0]
+			ty=opMsg.Params[1]
+			l.remove(pa,ty)
+		}
+		send<-l.returnCurrentSet()
+	}
+}
+
+//listen remotely
+func (l *replicationLayer) runRemotely(send chan RemoteMsg,recieve chan RemoteMsg){
+	var rmsg RemoteMsg
+	for{
+		rmsg=<-recieve
+		send<-rmsg
+	}
+}
+
 
 //update inteface
 
 func (l *replicationLayer) add(path string, typ string) {
+	//we might need to lock
 	el := replicationElement{name: path, elementType: typ}
 	// l.set = append(l.set, &el)
 	(*l.set).Add(el) //element get added

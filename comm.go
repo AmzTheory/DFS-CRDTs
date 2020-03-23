@@ -35,8 +35,11 @@ type Client struct {
 }
 
 type RemoteMsg struct {
-	ClientID int
+	SenderID int
 	Msg      string
+	Op		 string
+	Params   []string //operation operand for the operation
+	//uuid
 }
 
 func newClientManager(id int) *ClientManager {
