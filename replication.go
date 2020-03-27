@@ -16,8 +16,8 @@ var data string
 
 //Structs and type
 type replicationElement struct {
-	name        string
-	elementType string
+	Name        string
+	ElementType string
 }
 
 // type elementSet []*replicationElement
@@ -66,9 +66,8 @@ func (l *replicationLayer) runLocally(send chan RemoteMsg, recieve chan HierToRe
 		// } else if msg.op == "rm" {
 		// 	l.remove(msg.path, msg.fileType)
 		// }
-		
-		el := replicationElement{name: msg.path, elementType: msg.fileType}
-		var u interface{}
+		var el,u interface{}
+		el = replicationElement{Name: msg.path, ElementType: msg.fileType}
 		if(msg.op=="add"){
 			u = l.or.SrcAdd(el)
 		}else if(msg.op=="rm"){
@@ -87,17 +86,19 @@ func (l *replicationLayer) pushUpState(send chan map[*replicationElement]string,
 	send <- l.returnCurrentSet() //send the initial state
 	var opMsg RemoteMsg
 	var el,u interface{}
+	var r []interface{}
 	for { //wait for operation to be executed local/remotely
 		opMsg = <-recieve
 		if opMsg.Op == "add" {
 			el = opMsg.Params[0]
 			u = opMsg.Params[1]
-			l.or.Add(u.(string),el)// casting
+			l.or.Add(u.(string),el)
 			// l.add(pa, ty)
 		} else if opMsg.Op == "rm" {
 			el = opMsg.Params[0]
 			u = opMsg.Params[1]
-			l.or.Remove(u.(set.Set),el)// casting
+			r=u.([]interface{})
+			l.or.Remove(r,el)
 			// l.remove(pa, ty)
 		}
 		send <- l.returnCurrentSet()
@@ -117,7 +118,7 @@ func (l *replicationLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteM
 
 func (l *replicationLayer) add(path string, typ string) {
 	//we might need to lock
-	el := replicationElement{name: path, elementType: typ}
+	el := replicationElement{Name: path, ElementType: typ}
 	// l.set = append(l.set, &el)
 	(*l.set).Add(el) //element get added
 	l.cmap[&el] = "" //initate with an empty content
@@ -130,7 +131,7 @@ func (l *replicationLayer) remove(path string, typ string) {
 	// temp := set.New()
 	for _, i := range (*l.set).Values() {
 		ii := i.(replicationElement)
-		if ii.name == path && ii.elementType == typ {
+		if ii.Name == path && ii.ElementType == typ {
 			(*l.set).Remove(ii)
 		}
 	}
@@ -162,12 +163,12 @@ func (l *replicationLayer) printCurrentState() {
 	fmt.Println("\nCRDT_Set\n-------------")
 	// for _, k := range l.set {
 	// 	v := l.cmap[k]
-	// 	fmt.Println("", k.name, "content", v)
+	// 	fmt.Println("", k.Name, "content", v)
 	// }
 	for _, k := range l.or.Values() {
 		kk := (k.(replicationElement))
 		v := l.cmap[&kk]
-		fmt.Println("", kk.name, "content", v)
+		fmt.Println("", kk.Name, "content", v)
 	}
 	fmt.Println()
 }
@@ -188,7 +189,7 @@ func readDB(id int) (*set.Set, contentMap) {
 	var used int
 	for rows.Next() {
 		rows.Scan(&path, &elementType, &content, &used)
-		el := replicationElement{name: path, elementType: elementType}
+		el := replicationElement{Name: path, ElementType: elementType}
 		contentMap[&el] = content
 		if used == 1 {
 			s.Add(el)
@@ -219,7 +220,7 @@ func (l *replicationLayer) writeDB() {
 			used = 1
 		}
 		checkErr(err)
-		statement.Exec(k.name, k.elementType, v, used, l.dfs.id)
+		statement.Exec(k.Name, k.ElementType, v, used, l.dfs.id)
 
 	}
 }

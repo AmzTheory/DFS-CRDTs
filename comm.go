@@ -44,6 +44,11 @@ type RemoteMsg struct {
 }
 
 func newClientManager(id int) *ClientManager {
+	//register used types in gob for the encoding
+	gob.Register(replicationElement{})
+	gob.Register([]interface{}{})
+
+
 	fmt.Println("Starting server for " + strconv.Itoa(id))
 	listener, error := net.Listen("tcp", ":"+strconv.Itoa(id))
 
@@ -131,8 +136,8 @@ func (client *Client) receive(dfs *Dfs) {
 
 		//decode the bytes into RemoeteMessage
 		rmsg := decodeRemoteMsg(message)
-		fmt.Println(rmsg.Msg + " has been received by " + strconv.Itoa(client.id))
-		dfs.sendRemoteToRep(rmsg)
+		// fmt.Println(rmsg.Msg + " has been received by " + strconv.Itoa(client.id))
+		dfs.sendRemoteToRep(rmsg.(RemoteMsg))
 	}
 }
 
@@ -175,16 +180,17 @@ func (manager *ClientManager) connectToClients(dfs *Dfs) {
 
 //encoding/decoding functions
 
-func encodeRemoteMsg(rmsg RemoteMsg) []byte {
+func encodeRemoteMsg(rmsg interface{}) []byte {
 	var ref bytes.Buffer
 	enc := gob.NewEncoder(&ref)
+
 	err := enc.Encode(rmsg)
 	logEncDecError(err, "encode remote")
 	return ref.Bytes()
 }
 
-func decodeRemoteMsg(bits []byte) RemoteMsg {
-	var msg RemoteMsg
+func decodeRemoteMsg(bits []byte) interface{} {
+	var msg interface{}
 	buf := bytes.NewBuffer(bits)
 	err := gob.NewDecoder(buf).Decode(&msg)
 	logEncDecError(err, "decode remote")

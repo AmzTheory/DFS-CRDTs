@@ -187,7 +187,7 @@ func (l* hierLayer) runUp(rep chan map[*replicationElement]string ,ui chan *DfsT
 		msgr:=<-rep
 		//apply the policies
 		l.updateState(msgr)
-		// ui <-l.root //send the root to ui
+		ui <-l.root //send the root to ui
 	}
 }
 
@@ -198,8 +198,8 @@ func skip(map[*replicationElement]string){
 
 func findRoot(cmap map[*replicationElement]string) string {
 	for k := range cmap {
-		if !strings.Contains(k.name, "/") {
-			return k.name //root found
+		if !strings.Contains(k.Name, "/") {
+			return k.Name //root found
 		}
 	}
 	return ""
@@ -212,10 +212,10 @@ func getChildren(root *DfsTreeElement, cmap map[*replicationElement]string) []Df
 	path:=root.getPath()
 	temp := []DfsTreeElement{}
 	for k := range cmap {
-		p, n := pathAndName(k.name)
-		if p == path && k.name != "/" {
+		p, n := pathAndName(k.Name)
+		if p == path && k.Name != "/" {
 			el := DfsTreeElement{name: n,
-				fileType: k.elementType,
+				fileType: k.ElementType,
 				path:     p,
 				children: []*DfsTreeElement{},
 				parent: root,

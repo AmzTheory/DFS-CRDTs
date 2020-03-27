@@ -34,7 +34,7 @@ func (inst *DfsController) create(rep map[int][]int){
 }
 func (inst *DfsController) SetUpConnection(){
 	for _, v := range inst.replicas { 		
-		v.start()
+		v.start()	
 		b := make(chan bool)
 		go v.runAll(b)
 
