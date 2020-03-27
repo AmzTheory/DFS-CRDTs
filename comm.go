@@ -34,18 +34,19 @@ type Client struct {
 	data   chan []byte
 }
 
+//ADD & remove operations of the OR_SET
 type RemoteMsg struct {
 	SenderID int
 	Msg      string
-	Op		 string
-	Params   []string //operation operand for the operation
+	Op       string
+	Params   []interface{} //operation operand for the operation
 	//uuid
 }
 
 func newClientManager(id int) *ClientManager {
 	fmt.Println("Starting server for " + strconv.Itoa(id))
 	listener, error := net.Listen("tcp", ":"+strconv.Itoa(id))
-	
+
 	if error != nil {
 		fmt.Println(error)
 	}
@@ -59,19 +60,17 @@ func newClientManager(id int) *ClientManager {
 		unregister: make(chan *Client),
 	}
 
-
 	go manager.start()
 	go manager.waitForConns(listener)
-
 
 	return &manager
 }
 
 //wait for new clients
 func (manager *ClientManager) waitForConns(listener net.Listener) {
-// 	fmt.Printf("Listener on %d\n",manager.id)
-	
-	for i:=1;;i++ {
+	// 	fmt.Printf("Listener on %d\n",manager.id)
+
+	for i := 1; ; i++ {
 		connection, _ := listener.Accept()
 		client := &Client{id: 0, socket: connection, data: make(chan []byte)}
 		// fmt.Printf("%d accepts %d\n",manager.id,client.id)
@@ -86,7 +85,7 @@ func (manager *ClientManager) start() {
 	for {
 		// log.Printf("Still listening %d\n",manager.id)
 		select {
-		
+
 		case connection := <-manager.register:
 			manager.setClientOnline(connection)
 		case connection := <-manager.unregister:
@@ -132,11 +131,10 @@ func (client *Client) receive(dfs *Dfs) {
 
 		//decode the bytes into RemoeteMessage
 		rmsg := decodeRemoteMsg(message)
-		fmt.Println(rmsg.Msg+" has been received by "+strconv.Itoa(client.id))
+		fmt.Println(rmsg.Msg + " has been received by " + strconv.Itoa(client.id))
 		dfs.sendRemoteToRep(rmsg)
 	}
 }
-
 
 // client manager will send stream of bytes to a client
 func (manager *ClientManager) send(client *Client) {
@@ -150,7 +148,7 @@ func (manager *ClientManager) send(client *Client) {
 				return
 			}
 			client.socket.Write(message)
-			
+
 		}
 	}
 }

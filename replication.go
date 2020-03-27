@@ -1,26 +1,15 @@
 package main
 
 import (
+	crdt "CRDTsGO"
 	"database/sql"
 	"fmt"
 	"strconv"
+	"sync"
+
 	set "github.com/emirpasic/gods/sets/linkedhashset"
 	_ "github.com/mattn/go-sqlite3"
-	"sync"
 )
-
-/*
-fields
-	SET (assume its and ORSET) string
-	MAP (assume its CRDT)  String->String
-functions
-	add(p,t)
-	remove(p,t)
-	update(p,t,u)
-
-returns to upper layer
-	MAP   (p,t)->String (content)
-*/
 
 var dbPath string
 var data string
@@ -36,12 +25,12 @@ type elementSet *set.Set
 type contentMap map[*replicationElement]string
 
 type replicationLayer struct {
-	dfs  *Dfs
-	set  elementSet
-	cmap contentMap
+	dfs    *Dfs
+	set    elementSet
+	or     *crdt.ORSet
+	cmap   contentMap
 	opLock sync.Mutex
 }
-
 
 //initalisation
 func newReplicationLayer(id int) *replicationLayer {
@@ -57,6 +46,7 @@ func newReplicationLayer(id int) *replicationLayer {
 	l := replicationLayer{
 		dfs:  new(Dfs),
 		set:  s,
+		or:   crdt.NewORSet(),
 		cmap: dic,
 	}
 
@@ -66,7 +56,9 @@ func (l *replicationLayer) setDfs(dfs *Dfs) {
 	l.dfs = dfs
 }
 
-func (l *replicationLayer) runLocally(send chan RemoteMsg,recieve chan HierToRep) {
+//run locally & remotely comunicate theire messages to pushupState, which in turn get excuted by pushupstate, then passed to upper layers
+
+func (l *replicationLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
 	for {
 		msg := <-recieve
 		// if msg.op == "add" {
@@ -74,41 +66,52 @@ func (l *replicationLayer) runLocally(send chan RemoteMsg,recieve chan HierToRep
 		// } else if msg.op == "rm" {
 		// 	l.remove(msg.path, msg.fileType)
 		// }
-		rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
-		send <-rmsg
+		
+		el := replicationElement{name: msg.path, elementType: msg.fileType}
+		var u interface{}
+		if(msg.op=="add"){
+			u = l.or.SrcAdd(el)
+		}else if(msg.op=="rm"){
+			u= l.or.SrcRemove(el)
+		}
+		// rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
+		rmsg := RemoteMsg{SenderID: -1, Op: msg.op, Params: []interface{}{el, u}}
+		send <- rmsg
+		go l.dfs.sendRemote(rmsg) //broadcast to others
 		// send <- l.returnCurrentSet() //send the updated set to hier
 	}
 }
 
 //execute operation and update hier
-func(l *replicationLayer) pushUpState(send chan map[*replicationElement]string, recieve chan RemoteMsg){
+func (l *replicationLayer) pushUpState(send chan map[*replicationElement]string, recieve chan RemoteMsg) {
 	send <- l.returnCurrentSet() //send the initial state
 	var opMsg RemoteMsg
-	var pa,ty string
-	for{//wait for operation to be executed local/remotely
-		opMsg=<-recieve
-		if(opMsg.Op=="add"){
-			pa=opMsg.Params[0]
-			ty=opMsg.Params[1]
-			l.add(pa,ty)
-		}else if(opMsg.Op=="rm"){
-			pa=opMsg.Params[0]
-			ty=opMsg.Params[1]
-			l.remove(pa,ty)
+	var el,u interface{}
+	for { //wait for operation to be executed local/remotely
+		opMsg = <-recieve
+		if opMsg.Op == "add" {
+			el = opMsg.Params[0]
+			u = opMsg.Params[1]
+			l.or.Add(u.(string),el)// casting
+			// l.add(pa, ty)
+		} else if opMsg.Op == "rm" {
+			el = opMsg.Params[0]
+			u = opMsg.Params[1]
+			l.or.Remove(u.(set.Set),el)// casting
+			// l.remove(pa, ty)
 		}
-		send<-l.returnCurrentSet()
+		send <- l.returnCurrentSet()
 	}
 }
 
 //listen remotely
-func (l *replicationLayer) runRemotely(send chan RemoteMsg,recieve chan RemoteMsg){
+func (l *replicationLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteMsg) {
 	var rmsg RemoteMsg
-	for{
-		rmsg=<-recieve
-		send<-rmsg
+	for {
+		rmsg = <-recieve
+		send <- rmsg
 	}
 }
-
 
 //update inteface
 
@@ -143,13 +146,12 @@ func (l *replicationLayer) remove(path string, typ string) {
 
 //update hier by through dfs
 func (l *replicationLayer) updateDfs() {
-
 	l.dfs.updateHier(l.returnCurrentSet()) //select only one the exist in the setS
 }
 
 func (l *replicationLayer) returnCurrentSet() map[*replicationElement]string {
 	temp := make(map[*replicationElement]string)
-	for _, k := range (*l.set).Values() {
+	for _, k := range l.or.Values(){
 		kk := (k.(replicationElement))
 		temp[&kk] = l.cmap[&kk]
 	}
@@ -162,7 +164,7 @@ func (l *replicationLayer) printCurrentState() {
 	// 	v := l.cmap[k]
 	// 	fmt.Println("", k.name, "content", v)
 	// }
-	for _, k := range (*l.set).Values() {
+	for _, k := range l.or.Values() {
 		kk := (k.(replicationElement))
 		v := l.cmap[&kk]
 		fmt.Println("", kk.name, "content", v)
@@ -178,7 +180,7 @@ func readDB(id int) (*set.Set, contentMap) {
 	database, err := sql.Open("sqlite3", dbPath)
 	checkErr(err)
 
-	rows, err := database.Query("SELECT path,type,content,used from " + data+ " where dfsId="+strconv.Itoa(id))
+	rows, err := database.Query("SELECT path,type,content,used from " + data + " where dfsId=" + strconv.Itoa(id))
 	checkErr(err)
 	var path string
 	var elementType string
@@ -200,8 +202,8 @@ func readDB(id int) (*set.Set, contentMap) {
 func (l *replicationLayer) writeDB() {
 	database, _ := sql.Open("sqlite3", dbPath)
 	//delete dfs records
-	id:=(*l.dfs).id
-	statement, err := database.Prepare("delete from " + data+ " where dfsID="+strconv.Itoa(id))
+	id := (*l.dfs).id
+	statement, err := database.Prepare("delete from " + data + " where dfsID=" + strconv.Itoa(id))
 	statement.Exec()
 	checkErr(err)
 	// //creating data table
@@ -217,7 +219,7 @@ func (l *replicationLayer) writeDB() {
 			used = 1
 		}
 		checkErr(err)
-		statement.Exec(k.name, k.elementType, v, used,l.dfs.id)
+		statement.Exec(k.name, k.elementType, v, used, l.dfs.id)
 
 	}
 }

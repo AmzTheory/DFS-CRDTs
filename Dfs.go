@@ -48,7 +48,9 @@ func newDfs(id int, clients []int) *Dfs {
 	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id)}
 	return &d
 }
-
+var(
+	remToRep chan RemoteMsg
+)
 func (d *Dfs) runAll(ch chan bool) {
 	on = true
 
@@ -59,7 +61,7 @@ func (d *Dfs) runAll(ch chan bool) {
 	repTohier := make(chan map[*replicationElement]string)
 	hierToui := make(chan *DfsTreeElement)
 
-	remToRep:=make(chan RemoteMsg)
+	remToRep=make(chan RemoteMsg)
 	execOp:=make(chan RemoteMsg)
 
 	//go routines
@@ -91,9 +93,10 @@ func (d *Dfs) startConnecting(){
 func (d *Dfs) sendRemote(msg RemoteMsg) {
 	(d.manager.broadcast) <- msg
 }
+//executer recieved operations
 func (d *Dfs) sendRemoteToRep (msg RemoteMsg) {
 	//locked
-	
+	remToRep<-msg  //write to runLocally
 	
 }
 
