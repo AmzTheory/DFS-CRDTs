@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "fmt"
 )
 
 // "fmt"
@@ -26,6 +27,8 @@ type Dfs struct {
 	rep     *replicationLayer
 	manager *ClientManager
 	clients []int
+	rem     chan RemoteMsg
+	view    bool
 }
 
 //messages type
@@ -45,13 +48,15 @@ type HierToRep struct {
 var on bool
 
 func newDfs(id int, clients []int) *Dfs {
-	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id)}
+	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id),rem:make(chan RemoteMsg), view: false}
 	return &d
 }
-var(
+
+var (
 	remToRep chan RemoteMsg
 )
-func (d *Dfs) runAll(ch chan bool) {
+
+func (d *Dfs) runAll(ch chan bool, input chan bool) {
 	on = true
 
 	//channels
@@ -61,23 +66,26 @@ func (d *Dfs) runAll(ch chan bool) {
 	repTohier := make(chan map[*replicationElement]string)
 	hierToui := make(chan *DfsTreeElement)
 
-	remToRep=make(chan RemoteMsg)
-	execOp:=make(chan RemoteMsg)
+	remToRep = make(chan RemoteMsg)
+	execOp := make(chan RemoteMsg)
 
 	//go routines
-	go d.ui.run(uiTohier, hierToui)           //run ui
-	go d.hier.runDown(uiTohier, hierTorep)    //run hier  top->down
-	go d.hier.runUp(repTohier, hierToui)      //run hier  down -> top
+	go d.hier.runDown(uiTohier, hierTorep) //run hier  top->down
+	go d.hier.runUp(repTohier, hierToui)   //run hier  down -> top
 	go d.rep.runLocally(execOp, hierTorep) //run rep local thread
-	go d.rep.runRemotely(execOp,remToRep)
-	go d.rep.pushUpState(repTohier,execOp)
-	
-	
+	go d.rep.runRemotely(execOp, d.rem)
+	go d.rep.pushUpState(repTohier, execOp)
+
+	d.ui.recieveInitialRoot(hierToui)
+	go d.ui.runRecieve(hierToui)
+
 	d.manager = newClient(d.id)
 	ch <- true
 	//Wait for ever
 	for on {
 		//break when DFS closed
+		<-input
+		d.ui.run(uiTohier, input)
 
 	}
 
@@ -85,7 +93,7 @@ func (d *Dfs) runAll(ch chan bool) {
 	d.rep.writeDB()
 
 }
-func (d *Dfs) startConnecting(){
+func (d *Dfs) startConnecting() {
 	d.manager.connectToClients(d)
 }
 
@@ -93,16 +101,16 @@ func (d *Dfs) startConnecting(){
 func (d *Dfs) sendRemote(msg RemoteMsg) {
 	(d.manager.broadcast) <- msg
 }
+
 //executer recieved operations
-func (d *Dfs) sendRemoteToRep (msg RemoteMsg) {
-	//locked
-	remToRep<-msg  //write to runLocally
-	
+func (d *Dfs) waitForRemoteMsg(msg RemoteMsg) {
+	// for{
+	// 	msg:=<-d.rem
+
+	// }
+
 }
 
-func (d *Dfs) printInstanceRef() {
-	//	fmt.Println("calling reference",&d)
-}
 func (d *Dfs) start() {
 	d.rep.setDfs(d)
 	d.hier.setDfs(d)
@@ -143,5 +151,10 @@ func (d *Dfs) updateInterface(root *DfsTreeElement) {
 	d.ui.updateState(root)
 }
 func (d *Dfs) closeAll() {
-	on = false
+	// on = false
+	d.view = false
+}
+
+func (d *Dfs) View(val bool) {
+	d.view = val
 }

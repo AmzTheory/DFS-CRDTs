@@ -22,7 +22,7 @@ type replicationElement struct {
 
 // type elementSet []*replicationElement
 type elementSet *set.Set
-type contentMap map[*replicationElement]string
+type contentMap map[replicationElement]string
 
 type replicationLayer struct {
 	dfs    *Dfs
@@ -36,7 +36,7 @@ type replicationLayer struct {
 func newReplicationLayer(id int) *replicationLayer {
 	dbPath = "./src/DFS/data.db"
 	data = "data"
-	s, dic := readDB(id)
+	s, dic,_:= readDB(id)
 
 	// s := set.New()
 	// s.Add(el)
@@ -66,12 +66,12 @@ func (l *replicationLayer) runLocally(send chan RemoteMsg, recieve chan HierToRe
 		// } else if msg.op == "rm" {
 		// 	l.remove(msg.path, msg.fileType)
 		// }
-		var el,u interface{}
+		var el, u interface{}
 		el = replicationElement{Name: msg.path, ElementType: msg.fileType}
-		if(msg.op=="add"){
+		if msg.op == "add" {
 			u = l.or.SrcAdd(el)
-		}else if(msg.op=="rm"){
-			u= l.or.SrcRemove(el)
+		} else if msg.op == "rm" {
+			u = l.or.SrcRemove(el)
 		}
 		// rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
 		rmsg := RemoteMsg{SenderID: -1, Op: msg.op, Params: []interface{}{el, u}}
@@ -85,20 +85,21 @@ func (l *replicationLayer) runLocally(send chan RemoteMsg, recieve chan HierToRe
 func (l *replicationLayer) pushUpState(send chan map[*replicationElement]string, recieve chan RemoteMsg) {
 	send <- l.returnCurrentSet() //send the initial state
 	var opMsg RemoteMsg
-	var el,u interface{}
+	var el, u interface{}
 	var r []interface{}
 	for { //wait for operation to be executed local/remotely
 		opMsg = <-recieve
 		if opMsg.Op == "add" {
 			el = opMsg.Params[0]
 			u = opMsg.Params[1]
-			l.or.Add(u.(string),el)
+			l.or.Add(u.(string), el)
+			l.cmap[el.(replicationElement)] = ""
 			// l.add(pa, ty)
 		} else if opMsg.Op == "rm" {
 			el = opMsg.Params[0]
 			u = opMsg.Params[1]
-			r=u.([]interface{})
-			l.or.Remove(r,el)
+			r = u.([]interface{})
+			l.or.Remove(r, el)
 			// l.remove(pa, ty)
 		}
 		send <- l.returnCurrentSet()
@@ -110,7 +111,10 @@ func (l *replicationLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteM
 	var rmsg RemoteMsg
 	for {
 		rmsg = <-recieve
+		
 		send <- rmsg
+
+		// fmt.Println("rep Recieved ", l.dfs.id)
 	}
 }
 
@@ -121,7 +125,7 @@ func (l *replicationLayer) add(path string, typ string) {
 	el := replicationElement{Name: path, ElementType: typ}
 	// l.set = append(l.set, &el)
 	(*l.set).Add(el) //element get added
-	l.cmap[&el] = "" //initate with an empty content
+	// l.cmap[&el] = "" //initate with an empty content
 	// l.updateDfs()
 	fmt.Println("added", path)
 }
@@ -152,13 +156,14 @@ func (l *replicationLayer) updateDfs() {
 
 func (l *replicationLayer) returnCurrentSet() map[*replicationElement]string {
 	temp := make(map[*replicationElement]string)
-	for _, k := range l.or.Values(){
+	for _, k := range l.or.Values() {
 		kk := (k.(replicationElement))
-		temp[&kk] = l.cmap[&kk]
+		temp[&kk] = l.cmap[kk]
 	}
 	return temp
 }
 
+//
 func (l *replicationLayer) printCurrentState() {
 	fmt.Println("\nCRDT_Set\n-------------")
 	// for _, k := range l.set {
@@ -167,16 +172,17 @@ func (l *replicationLayer) printCurrentState() {
 	// }
 	for _, k := range l.or.Values() {
 		kk := (k.(replicationElement))
-		v := l.cmap[&kk]
+		v := l.cmap[kk]
 		fmt.Println("", kk.Name, "content", v)
 	}
 	fmt.Println()
 }
 
 //read the databse
-func readDB(id int) (*set.Set, contentMap) {
+func readDB(id int) (*set.Set, contentMap,*crdt.ORSet) {
 	s := set.New()
-	contentMap := make(map[*replicationElement]string)
+	or := crdt.NewORSet()
+	contentMap := make(map[replicationElement]string)
 
 	database, err := sql.Open("sqlite3", dbPath)
 	checkErr(err)
@@ -190,14 +196,15 @@ func readDB(id int) (*set.Set, contentMap) {
 	for rows.Next() {
 		rows.Scan(&path, &elementType, &content, &used)
 		el := replicationElement{Name: path, ElementType: elementType}
-		contentMap[&el] = content
+		contentMap[el] = content
 		if used == 1 {
 			s.Add(el)
+			// or.Add(el)
 		}
 
 	}
 	rows.Close()
-	return s, contentMap
+	return s, contentMap , or
 }
 
 func (l *replicationLayer) writeDB() {
@@ -216,9 +223,10 @@ func (l *replicationLayer) writeDB() {
 	//insert data points
 	for k, v := range l.cmap {
 		used := 0
-		if (*l.set).Contains(*k) {
+		if (*l.set).Contains(k){
 			used = 1
 		}
+
 		checkErr(err)
 		statement.Exec(k.Name, k.ElementType, v, used, l.dfs.id)
 

@@ -46,8 +46,8 @@ type RemoteMsg struct {
 func newClientManager(id int) *ClientManager {
 	//register used types in gob for the encoding
 	gob.Register(replicationElement{})
+	gob.Register(RemoteMsg{})
 	gob.Register([]interface{}{})
-
 
 	fmt.Println("Starting server for " + strconv.Itoa(id))
 	listener, error := net.Listen("tcp", ":"+strconv.Itoa(id))
@@ -77,8 +77,13 @@ func (manager *ClientManager) waitForConns(listener net.Listener) {
 
 	for i := 1; ; i++ {
 		connection, _ := listener.Accept()
-		client := &Client{id: 0, socket: connection, data: make(chan []byte)}
-		// fmt.Printf("%d accepts %d\n",manager.id,client.id)
+		b:=make([]byte,20)
+		connection.Read(b)
+		n := bytes.IndexByte(b,0)
+		id,_:= strconv.Atoi( string(b[:n]))
+
+		client := &Client{id:id, socket: connection, data: make(chan []byte)}
+		
 		manager.register <- client
 		//routines for aparticular client
 		// go manager.receive(client)
@@ -95,13 +100,13 @@ func (manager *ClientManager) start() {
 			manager.setClientOnline(connection)
 		case connection := <-manager.unregister:
 			manager.setClientOffline(connection)
-			log.Println("A connection has terminated!")
+			// log.Println("A connection has terminated!")
 		case message := <-manager.broadcast:
 			// log.Println("broadcast triggered")
 			msg := encodeRemoteMsg(message)
+			
 			for _, conn := range manager.active.Values() {
 				con := conn.(*Client)
-				// log.Println(message.Msg+" is being sent to "+strconv.Itoa(con.id))
 				select {
 				case con.data <- msg:
 				default:
@@ -115,6 +120,7 @@ func (manager *ClientManager) start() {
 func (manager *ClientManager) setClientOffline(con *Client) {
 	close(con.data)
 	manager.offline.Add(con.id)
+	
 	manager.active.Remove(con)
 }
 func (manager *ClientManager) setClientOnline(con *Client) {
@@ -136,8 +142,9 @@ func (client *Client) receive(dfs *Dfs) {
 
 		//decode the bytes into RemoeteMessage
 		rmsg := decodeRemoteMsg(message)
-		// fmt.Println(rmsg.Msg + " has been received by " + strconv.Itoa(client.id))
-		dfs.sendRemoteToRep(rmsg.(RemoteMsg))
+		// fmt.Println("call by ", dfs)
+		// dfs.sendRemoteToRep(rmsg.(RemoteMsg))
+		dfs.rem<-rmsg.(RemoteMsg)
 	}
 }
 
@@ -152,6 +159,7 @@ func (manager *ClientManager) send(client *Client) {
 			if !ok {
 				return
 			}
+			// log.Println(manager.id," ---------------> ",client.id)
 			client.socket.Write(message)
 
 		}
@@ -172,7 +180,12 @@ func (manager *ClientManager) connectToClients(dfs *Dfs) {
 			fmt.Println(error)
 		}
 		// fmt.Println("Connection achieved between " + strconv.Itoa(manager.id) + " and " + strconv.Itoa(i))
+		
+		var arr [20]byte
+		copy(arr[:],strconv.Itoa(manager.id))
 
+		connection.Write(arr[:])
+		// fmt.Printf("array: %v \n", arr)
 		client := &Client{id: manager.id, socket: connection, data: make(chan []byte)}
 		go client.receive(dfs)
 	}
@@ -190,7 +203,7 @@ func encodeRemoteMsg(rmsg interface{}) []byte {
 }
 
 func decodeRemoteMsg(bits []byte) interface{} {
-	var msg interface{}
+	var msg RemoteMsg
 	buf := bytes.NewBuffer(bits)
 	err := gob.NewDecoder(buf).Decode(&msg)
 	logEncDecError(err, "decode remote")
