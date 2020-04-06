@@ -80,14 +80,14 @@ func (l *hierLayer) setDfs(dfs *Dfs) {
 //Update Interface
 
 //add element
-func (l *hierLayer) add(path string, name string, typ string) {
-	l.dfs.UpdateAddReplication(path+"/"+name, typ)
-}
+// func (l *hierLayer) add(path string, name string, typ string) {
+// 	l.dfs.UpdateAddReplication(path+"/"+name, typ)
+// }
 
-//remove element
-func (l *hierLayer) remove(path string, typ string) {
-	l.dfs.UpdateRemoveReplication(path, typ)
-}
+// //remove element
+// func (l *hierLayer) remove(path string, typ string) {
+// 	l.dfs.UpdateRemoveReplication(path, typ)
+// }
 
 // func (tree DfsTree) update(path string,name string,typ string){
 // 	fmt.Println("Element has been updated")

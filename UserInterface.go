@@ -160,14 +160,10 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 			fmt.Println("\tmk      create new file/directory\tmk name filetype")
 			fmt.Println("\trm  	   remove file/directory\trm name filetype")
 			fmt.Println("\tprintfs print the file system tree")
-			fmt.Println("\tquit    quit the file system (go offline) quit")
+			fmt.Println("\tquit    turn off access mode")
 		} else if command == "quit" {
-			fmt.Println("DFS is closed")
 			l.currentDir = *l.root
 			input <- true
-			// break
-			// l.dfs.closeAll()
-			//close the Dfs instance
 			break
 		} else {
 			fmt.Println("->" + command + " Unknown command")

@@ -27,36 +27,7 @@ func main() {
 	// fmt.Println(rmap)
 	cont.run()
 
-	// for{
-	//DFS is ready for operation execution/communication between replicas
-
-	// aContent := []string{"a", "b", "c"}
-	// bContent := []string{"d", "a", "e", "g"}
-
-	// aRmContent := []string{"a"}
-	// bRmContent := []string{"g"}
-
-	// a := crdt.NewORSet()
-	// b := crdt.NewORSet()
-
-	// // //channels
-	// aAdd := make(chan Apair)
-	// aRm := make(chan Rpair)
-
-	// bAdd := make(chan Apair)
-	// bRm := make(chan Rpair)
-
-	// go listenOR(a, aAdd, aRm)
-	// go listenOR(b, bAdd, bRm)
-
-	// //pass to other set
-	// go setOp(a, bAdd, bRm, aContent, aRmContent)
-	// go setOp(b, aAdd, aRm, bContent, bRmContent)
-
-	// time.Sleep(5 * time.Second)
-
-	// a.PrintElements()
-	// b.PrintElements()
+	
 
 }
 

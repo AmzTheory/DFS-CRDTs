@@ -122,22 +122,22 @@ func (d *Dfs) start() {
 //downwards
 
 //User interface to Hier
-func (d *Dfs) updateAddHier(path string, n string, typ string) {
-	d.UpdateAddReplication(path+n, typ)
-}
-func (d *Dfs) updateRemoveHier(path string, typ string) {
-	d.UpdateRemoveReplication(path, typ)
-}
+// func (d *Dfs) updateAddHier(path string, n string, typ string) {
+// 	d.UpdateAddReplication(path+n, typ)
+// }
+// func (d *Dfs) updateRemoveHier(path string, typ string) {
+// 	d.UpdateRemoveReplication(path, typ)
+// }
 
 //update
 
-//Hier to replication
-func (d *Dfs) UpdateAddReplication(path string, typ string) {
-	d.rep.add(path, typ)
-}
-func (d *Dfs) UpdateRemoveReplication(path string, typ string) {
-	d.rep.remove(path, typ)
-}
+// //Hier to replication
+// func (d *Dfs) UpdateAddReplication(path string, typ string) {
+// 	d.rep.add(path, typ)
+// }
+// func (d *Dfs) UpdateRemoveReplication(path string, typ string) {
+// 	d.rep.remove(path, typ)
+// }
 
 //replication to other replicas (future)
 
@@ -151,10 +151,6 @@ func (d *Dfs) updateInterface(root *DfsTreeElement) {
 	d.ui.updateState(root)
 }
 func (d *Dfs) closeAll() {
-	// on = false
-	d.view = false
+	d.rep.writeDB()
 }
 
-func (d *Dfs) View(val bool) {
-	d.view = val
-}
