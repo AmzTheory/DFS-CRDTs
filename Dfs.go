@@ -28,7 +28,6 @@ type Dfs struct {
 	manager *ClientManager
 	clients []int
 	rem     chan RemoteMsg
-	view    bool
 }
 
 //messages type
@@ -48,13 +47,13 @@ type HierToRep struct {
 var on bool
 
 func newDfs(id int, clients []int) *Dfs {
-	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id),rem:make(chan RemoteMsg), view: false}
+	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg)}
 	return &d
 }
 
-var (
-	remToRep chan RemoteMsg
-)
+// var (
+// 	remToRep chan RemoteMsg
+// )
 
 func (d *Dfs) runAll(ch chan bool, input chan bool) {
 	on = true
@@ -66,7 +65,7 @@ func (d *Dfs) runAll(ch chan bool, input chan bool) {
 	repTohier := make(chan map[*replicationElement]string)
 	hierToui := make(chan *DfsTreeElement)
 
-	remToRep = make(chan RemoteMsg)
+	// remToRep = make(chan RemoteMsg)
 	execOp := make(chan RemoteMsg)
 
 	//go routines

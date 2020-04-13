@@ -98,7 +98,7 @@ func updateReplation() {
 	//communicate it to the Dfs instance
 }
 
-//modify the state based on new info from replication
+//modify the state based on new info from replication(Defualt implement skip )
 func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 	//go through the map and build the tree
 	l.root = &DfsTreeElement{name: "/", fileType: "dir", path: "", content: "",parent:nil,}
@@ -133,7 +133,11 @@ func (l *hierLayer) updateState(cmap map[*replicationElement]string) {
 
 
 func (l *hierLayer) reappear() {
-	//request the content of reappear filed from the replication
+	//rreappear policy
+}
+
+func skip(map[*replicationElement]string){
+	//iterate thro
 }
 
 
@@ -191,9 +195,7 @@ func (l* hierLayer) runUp(rep chan map[*replicationElement]string ,ui chan *DfsT
 	}
 }
 
-func skip(map[*replicationElement]string){
-	//iterate thro
-}
+
 
 
 func findRoot(cmap map[*replicationElement]string) string {
@@ -208,6 +210,7 @@ func pathAndName(str string) (string, string) {
 	li := strings.LastIndex(str, "/")
 	return str[:li+1], str[li+1:]
 }
+
 func getChildren(root *DfsTreeElement, cmap map[*replicationElement]string) []DfsTreeElement {
 	path:=root.getPath()
 	temp := []DfsTreeElement{}

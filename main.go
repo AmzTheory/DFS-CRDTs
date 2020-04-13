@@ -2,7 +2,8 @@ package main
 
 import (
 	crdt "CRDTsGO"
-	// "fmt"
+	"reflect"
+	"fmt"
 	// set "github.com/emirpasic/gods/sets/linkedhashset"
 )
 
@@ -18,16 +19,20 @@ import (
 
 func main() {
 
-	rmap := generateReplicasMap(2)
-	cont := NewController()
-	cont.create(rmap)
-	cont.SetUpConnection()
-	cont.SetUpCommunication()
+	// rmap := generateReplicasMap(2)
+	// cont := NewController()
+	// cont.create(rmap)
+	// cont.SetUpConnection()
+	// cont.SetUpCommunication()
 
-	// fmt.Println(rmap)
-	cont.run()
-
+	// // fmt.Println(rmap)
+	// cont.run()
+	a:=[]interface{}{"a","b"}
+	b:=[]interface{}{"a","b"}
+	c:=[]interface{}{"a"}
 	
+	fmt.Println(reflect.DeepEqual(a,b))
+	fmt.Println(reflect.DeepEqual(a,c))
 
 }
 

@@ -21,6 +21,8 @@ type replicationElement struct {
 	ElementType string
 }
 
+
+
 // type elementSet []*replicationElement
 type elementSet *set.Set
 type contentMap map[replicationElement]string
@@ -34,15 +36,16 @@ type replicationLayer struct {
 }
 
 //initalisation
-func newReplicationLayer(id int) *replicationLayer {
+func newReplicationLayer(id int,DB bool) *replicationLayer {
 	dbPath = "./src/DFS/data.db"
 	data = "data"
-	s, dic, or := readDB(id)
+	s, dic, or :=set.New() , make(map[replicationElement]string), crdt.NewORSet()
+	
+	if(DB){  //read DB
+		s,dic,or =readDB(id)
+	}
 
-	// s := set.New()
-	// s.Add(el)
-	// dic := make(map[*replicationElement]string)
-	// dic[&el] = ""
+
 
 	l := replicationLayer{
 		dfs:  new(Dfs),
@@ -212,7 +215,7 @@ func (l *replicationLayer) writeDB() {
 		token = ""
 		if (*l.or).Contains(k) {
 			used = 1
-			token = l.or.GetTokens(k)
+			token =GetTokens(l.or,k)
 		}
 
 		checkErr(err)
@@ -226,3 +229,16 @@ func checkErr(err error) {
 		panic(err)
 	}
 }
+
+//GetTokens get set of tokens associated with specific element in the OR.set
+func GetTokens(or *crdt.ORSet, el interface{}) string {
+	items := []string{}
+
+	it := or.Get(el).Iterator()
+	for it.Next() {
+		items = append(items, fmt.Sprintf("%v", it.Value()))
+	}
+
+	return strings.Join(items, ", ")
+}
+
