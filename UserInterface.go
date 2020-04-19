@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bufio"
+	// "bufio"
 	"fmt"
-	"os"
+	// "os"
 	"strings"
 
 	"github.com/disiqueira/gotree"
@@ -27,10 +27,11 @@ type UserInterface struct {
 	root       *DfsTreeElement
 	dfs        *Dfs
 	currentDir DfsTreeElement
+	intchan    chan string
 }
 
-func newUserInteface(r *DfsTreeElement, d *Dfs) *UserInterface {
-	return &UserInterface{root: r, dfs: d, currentDir: DfsTreeElement{}}
+func newUserInteface(r *DfsTreeElement, d *Dfs,ch chan string) *UserInterface {
+	return &UserInterface{root: r, dfs: d, currentDir: DfsTreeElement{},intchan:ch}
 }
 
 func (l UserInterface) printDfs() {
@@ -53,7 +54,7 @@ func (l *UserInterface) recieveInitialRoot(recieve chan *DfsTreeElement) {
 	l.currentDir = *l.root
 }
 
-func (l *UserInterface) run(send chan UiToHier, input chan bool) {
+func (l *UserInterface) run(send chan UiToHier, input chan bool) {	
 	/**
 	cd  change current Directory
 	ls  show files in current directory
@@ -62,15 +63,17 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 	printFs	print the entire Dfs
 	quit   close the program(go offline)
 	*/
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 	//infinite loop
+	var text string
 	for {
 
 		fmt.Print(l.currentDir.getPath() + "->")
-		text, _ := reader.ReadString('\n')
-
-		text = strings.Replace(text, "\n", "", 1)
-		// fmt.Println(text)
+		// text, _ := reader.ReadString('\n')
+		
+		// text = strings.Replace(text, "\n", "", 1)
+		text=<-l.intchan
+		
 
 		words := strings.Split(text, " ")
 
@@ -161,11 +164,16 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 			fmt.Println("\trm  	   remove file/directory\trm name filetype")
 			fmt.Println("\tprintfs print the file system tree")
 			fmt.Println("\tquit    turn off access mode")
+			fmt.Println("\toffline   go offline")
 		} else if command == "quit" {
 			l.currentDir = *l.root
 			input <- true
 			break
-		} else {
+		}else if command == "offline" {
+			l.currentDir = *l.root
+			input <- true
+			break
+		}else {
 			fmt.Println("->" + command + " Unknown command")
 		}
 	}

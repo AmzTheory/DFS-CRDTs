@@ -27,6 +27,8 @@ type Dfs struct {
 	rep     *replicationLayer
 	manager *ClientManager
 	clients []int
+	servID  int
+	dfsServ *Client 
 	rem     chan RemoteMsg
 }
 
@@ -46,8 +48,8 @@ type HierToRep struct {
 
 var on bool
 
-func newDfs(id int, clients []int) *Dfs {
-	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg)}
+func newDfs(id int, clients []int,servID int) *Dfs {
+	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg),servID:servID}
 	return &d
 }
 
@@ -55,7 +57,7 @@ func newDfs(id int, clients []int) *Dfs {
 // 	remToRep chan RemoteMsg
 // )
 
-func (d *Dfs) runAll(ch chan bool, input chan bool) {
+func (d *Dfs) runAll() {
 	on = true
 
 	//channels
@@ -68,6 +70,8 @@ func (d *Dfs) runAll(ch chan bool, input chan bool) {
 	// remToRep = make(chan RemoteMsg)
 	execOp := make(chan RemoteMsg)
 
+	input:=make(chan bool)
+
 	//go routines
 	go d.hier.runDown(uiTohier, hierTorep) //run hier  top->down
 	go d.hier.runUp(repTohier, hierToui)   //run hier  down -> top
@@ -77,16 +81,11 @@ func (d *Dfs) runAll(ch chan bool, input chan bool) {
 
 	d.ui.recieveInitialRoot(hierToui)
 	go d.ui.runRecieve(hierToui)
+	go d.ui.run(uiTohier,input)
 
 	d.manager = newClient(d.id)
-	ch <- true
-	//Wait for ever
-	for on {
-		//break when DFS closed
-		<-input
-		d.ui.run(uiTohier, input)
 
-	}
+	<-input  //Dfs gods offline
 
 	//get the data from DB
 	d.rep.writeDB()
@@ -101,21 +100,21 @@ func (d *Dfs) sendRemote(msg RemoteMsg) {
 	(d.manager.broadcast) <- msg
 }
 
-//executer recieved operations
-func (d *Dfs) waitForRemoteMsg(msg RemoteMsg) {
-	// for{
-	// 	msg:=<-d.rem
-
-	// }
-
-}
-
 func (d *Dfs) start() {
 	d.rep.setDfs(d)
 	d.hier.setDfs(d)
-	d.ui = newUserInteface(d.hier.root, d)
+	
+	/**
+		connect to the testing server
+	**/
+	ch:=make(chan string)
+	d.dfsServ=getClientUIServer(d.servID,d.id,ch)
+	
+	d.ui = newUserInteface(d.hier.root, d,ch)
+	
 
-	d.ui.printDfs()
+
+	// d.ui.printDfs()
 }
 
 //downwards

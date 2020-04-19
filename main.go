@@ -1,10 +1,10 @@
 package main
 
 import (
-	crdt "CRDTsGO"
-	"reflect"
-	"fmt"
-	// set "github.com/emirpasic/gods/sets/linkedhashset"
+	"os"
+	"strconv"
+	"strings"
+	// "fmt"
 )
 
 // func main() {
@@ -18,60 +18,26 @@ import (
 // }
 
 func main() {
+	//id  list of clients TESTServer
+	id,_:=strconv.Atoi(os.Args[1])
+	cls:=os.Args[2]
+	clients:=getListOfInts(strings.Split(cls,","))
+	serv,_:=strconv.Atoi(os.Args[3])//
 
-	// rmap := generateReplicasMap(2)
-	// cont := NewController()
-	// cont.create(rmap)
-	// cont.SetUpConnection()
-	// cont.SetUpCommunication()
+	dfs:=newDfs(id,clients,serv)
+	dfs.start()
+	dfs.runAll()
 
-	// // fmt.Println(rmap)
-	// cont.run()
-	a:=[]interface{}{"a","b"}
-	b:=[]interface{}{"a","b"}
-	c:=[]interface{}{"a"}
 	
-	fmt.Println(reflect.DeepEqual(a,b))
-	fmt.Println(reflect.DeepEqual(a,c))
 
 }
 
-//Add Pair
-type Apair struct {
-	u string
-	e string
-}
-
-//rm Pair
-type Rpair struct {
-	R []interface{}
-	e string
-}
-
-func listenOR(set *crdt.ORSet, add chan Apair, rm chan Rpair) {
-	for {
-		select {
-		case p := <-add:
-			set.Add(p.u, p.e)
-		case q := <-rm:
-			set.Remove(q.R, q.e)
-
-		}
+func getListOfInts(ls []string) []int{
+	clients:=[]int{}
+	var a int
+	for _,v:=range ls{
+		a,_=strconv.Atoi(v)
+		clients=append(clients,a)
 	}
-}
-
-func setOp(set *crdt.ORSet, aSend chan Apair, rmSend chan Rpair, cotent []string, rmcontent []string) {
-
-	//add elements
-	for _, el := range cotent {
-		u := set.AddL(el)
-		aSend <- Apair{u: u, e: el}
-	}
-
-	//remove elements
-	for _, el := range rmcontent {
-		r := set.RemoveL(el)
-
-		rmSend <- Rpair{R: r, e: el}
-	}
+	return clients
 }

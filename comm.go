@@ -75,7 +75,7 @@ func newClientManager(id int) *ClientManager {
 func (manager *ClientManager) waitForConns(listener net.Listener) {
 	// 	fmt.Printf("Listener on %d\n",manager.id)
 
-	for i := 1; ; i++ {
+	for true {
 		connection, _ := listener.Accept()
 		b:=make([]byte,20)
 		connection.Read(b)
@@ -88,6 +88,7 @@ func (manager *ClientManager) waitForConns(listener net.Listener) {
 		//routines for aparticular client
 		// go manager.receive(client)
 		go manager.send(client)
+		//send unsent operations
 	}
 }
 
@@ -160,8 +161,8 @@ func (manager *ClientManager) send(client *Client) {
 				return
 			}
 			// log.Println(manager.id," ---------------> ",client.id)
-			client.socket.Write(message)
-
+			_,_=client.socket.Write(message)
+			//record an unsent operatoins
 		}
 	}
 }
@@ -174,24 +175,56 @@ func newClient(id int) *ClientManager {
 }
 func (manager *ClientManager) connectToClients(dfs *Dfs) {
 	for _, i := range dfs.clients {
-		// fmt.Println("attempting " + strconv.Itoa(manager.id) + " connects to " + strconv.Itoa(i))
-		connection, error := net.Dial("tcp", "localhost:"+strconv.Itoa(i))
-		if error != nil {
-			fmt.Println(error)
-		}
-		// fmt.Println("Connection achieved between " + strconv.Itoa(manager.id) + " and " + strconv.Itoa(i))
-		
-		var arr [20]byte
-		copy(arr[:],strconv.Itoa(manager.id))
-
-		connection.Write(arr[:])
-		// fmt.Printf("array: %v \n", arr)
-		client := &Client{id: manager.id, socket: connection, data: make(chan []byte)}
+		client:=connectToLocalHost(i,manager.id)
 		go client.receive(dfs)
 	}
 }
 
 //encoding/decoding functions
+
+
+func connectToLocalHost(port int,myID int) *Client{
+	connection, error := net.Dial("tcp", "localhost:"+strconv.Itoa(port))
+	if error != nil {
+		fmt.Println(error)
+	}
+		
+	var arr [20]byte
+	copy(arr[:],strconv.Itoa(myID))
+	connection.Write(arr[:])
+	client := &Client{id: myID, socket: connection, data: make(chan []byte)}
+	
+	return client
+}
+
+func (client *Client) recieveInterface(ch chan string){
+	for {
+		message := make([]byte, 4096)
+		_, err := client.socket.Read(message)
+
+		if err != nil {
+			client.socket.Close()
+			break
+		}
+
+		//decode
+		msg:=bytestoString(message)
+		log.Println(msg)
+		ch<-msg
+	}	
+}
+func getClientUIServer(port int,myID int,ch chan string) *Client{
+	client:=connectToLocalHost(port,myID)
+	go client.recieveInterface(ch)
+	return client
+}
+
+
+func bytestoString(b []byte) string {
+	n := bytes.IndexByte(b, 0)
+	return string(b[:n])
+}
+
 
 func encodeRemoteMsg(rmsg interface{}) []byte {
 	var ref bytes.Buffer
