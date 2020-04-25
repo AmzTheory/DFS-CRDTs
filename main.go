@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	// "fmt"
+	"fmt"
 )
 
 // func main() {
@@ -23,7 +23,7 @@ func main() {
 	cls:=os.Args[2]
 	clients:=getListOfInts(strings.Split(cls,","))
 	serv,_:=strconv.Atoi(os.Args[3])//
-
+	fmt.Println(clients)
 	dfs:=newDfs(id,clients,serv)
 	dfs.start()
 	dfs.runAll()

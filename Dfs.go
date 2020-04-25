@@ -83,7 +83,8 @@ func (d *Dfs) runAll() {
 	go d.ui.runRecieve(hierToui)
 	go d.ui.run(uiTohier,input)
 
-	d.manager = newClient(d.id)
+	d.manager = newClient(d)
+	d.manager.connectToClients(d)
 
 	<-input  //Dfs gods offline
 

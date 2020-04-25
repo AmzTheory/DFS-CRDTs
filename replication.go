@@ -65,11 +65,6 @@ func (l *replicationLayer) setDfs(dfs *Dfs) {
 func (l *replicationLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
 	for {
 		msg := <-recieve
-		// if msg.op == "add" {
-		// 	l.add(msg.path, msg.fileType)
-		// } else if msg.op == "rm" {
-		// 	l.remove(msg.path, msg.fileType)
-		// }
 		var el, u interface{}
 		el = replicationElement{Name: msg.path, ElementType: msg.fileType}
 		if msg.op == "add" {
@@ -78,9 +73,10 @@ func (l *replicationLayer) runLocally(send chan RemoteMsg, recieve chan HierToRe
 			u = l.or.SrcRemove(el)
 		}
 		// rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
-		rmsg := RemoteMsg{SenderID: -1, Op: msg.op, Params: []interface{}{el, u}}
+		rmsg := RemoteMsg{SenderID: -1, Op: msg.op,P1:el,P2:u}
+		// fmt.Println(u)
 		send <- rmsg
-		go l.dfs.sendRemote(rmsg) //broadcast to others
+		go l.dfs.sendRemote(rmsg) //TODO: might miss local execution
 		// send <- l.returnCurrentSet() //send the updated set to hier
 	}
 }
@@ -93,13 +89,18 @@ func (l *replicationLayer) pushUpState(send chan map[*replicationElement]string,
 	var r []interface{}
 	for { //wait for operation to be executed local/remotely
 		opMsg = <-recieve
+		// fmt.Println(opMsg)
 		if opMsg.Op == "add" {
-			el = opMsg.Params[0]
-			u = opMsg.Params[1]
+			// el = opMsg.Params[0]
+			// u = opMsg.Params[1]
+			el=opMsg.P1
+			u=opMsg.P2
 			l.add(el.(replicationElement), u.(string))
 		} else if opMsg.Op == "rm" {
-			el = opMsg.Params[0]
-			u = opMsg.Params[1]
+			// el = opMsg.Params[0]
+			// u = opMsg.Params[1]
+			el=opMsg.P1
+			u=opMsg.P2
 			r = u.([]interface{})
 			l.remove(r, el)
 		}

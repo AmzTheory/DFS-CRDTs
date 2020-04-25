@@ -9,60 +9,123 @@ import (
 	"strconv"
 
 	set "github.com/emirpasic/gods/sets/linkedhashset"
+	// queue "github.com/enriquebris/goconcurrentqueue"
+	cmap "github.com/orcaman/concurrent-map"
 )
 
+
 /*
-set fixed set of clients
-unregistering and registering
+start server
+		once c is connected
+			set online
+			send unsent ops  (map dfs->queue)
+			
+when sedning brodcast
+	if replica offline  (onlineMAP)
+		add into unsent op dt(concQueue)
+	else
+		send
+	
+socket failure
+	failed to send
+		set offline
+		add the missing ops into Queue
 
-incopperate with DFS
-test it
+recover lost replica con (client side)
+	1-start gr to connect to each replica
+		once found , the recive will trigger
+			recieve will notice socket fialure
+						return to 1
+
+
+
 */
-
 type ClientManager struct {
 	id         int //client ID
 	active     *set.Set
 	offline    *set.Set
+	onlineMap  *cmap.ConcurrentMap
+	unSentOps  *cmap.ConcurrentMap
 	broadcast  chan RemoteMsg //remote message
 	register   chan *Client   //client
 	unregister chan *Client   //client
+	dfs 	   *Dfs
 }
+
+
+func (manager *ClientManager) getOnlineMap(id string) *Client{
+	v,_:=manager.onlineMap.Get(id)
+	if(v!=nil) {return v.(*Client)}
+
+	return nil//incase the value still nil (not online)
+}
+func (manager *ClientManager) setOnlineMap(id int,value *Client){
+	i:=strconv.Itoa(id)
+	manager.onlineMap.Set(i,value)
+}
+func (manager *ClientManager) getMissingOps(id int) []interface{}{
+	i:=strconv.Itoa(id)
+	defer manager.unSentOps.Set(i,set.New()) //init new set once returned  
+	v,_:=manager.unSentOps.Get(i)
+	return v.(*set.Set).Values()
+}
+func (manager *ClientManager) addMissingOps(id string,op RemoteMsg){
+	q,_:=manager.unSentOps.Get(id)
+	s:=q.(*set.Set)
+	s.Add(op)//added
+}
+
 
 type Client struct {
-	id     int
-	socket net.Conn
-	data   chan []byte
+	id       int
+	destPort int
+	socket 	 net.Conn
+	data   	 chan []byte
 }
-
+																																										
 //ADD & remove operations of the OR_SET
 type RemoteMsg struct {
 	SenderID int
 	Msg      string
 	Op       string
-	Params   []interface{} //operation operand for the operation
-	//uuid
+	// Params   []interface{} //operation operand for the operation
+	P1       interface{}
+	P2       interface{}
 }
 
-func newClientManager(id int) *ClientManager {
+
+func newClientManager(d *Dfs) *ClientManager {
 	//register used types in gob for the encoding
 	gob.Register(replicationElement{})
 	gob.Register(RemoteMsg{})
-	gob.Register([]interface{}{})
+	// gob.Register()
+	
 
-	fmt.Println("Starting server for " + strconv.Itoa(id))
-	listener, error := net.Listen("tcp", ":"+strconv.Itoa(id))
+	// fmt.Println("Starting server for " + strconv.Itoa(id))
+	listener, error := net.Listen("tcp", ":"+strconv.Itoa(d.id))
 
 	if error != nil {
 		fmt.Println(error)
 	}
+	//store the initalOnlineMap with nil (yet to be connected)
+	onlineMap:=cmap.New()
+	unSentOps:=cmap.New()
+	for _,v:=range d.clients{
+		i:=strconv.Itoa(v)
+		onlineMap.Set(i,nil)
+		unSentOps.Set(i,set.New())
+	}
 
 	manager := ClientManager{
-		id:         id,
+		id:         d.id,
 		active:     set.New(), //empty set (will be added when connected)
 		offline:    set.New(),
+		onlineMap:  &onlineMap,
+		unSentOps:  &unSentOps,
 		broadcast:  make(chan RemoteMsg),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		dfs:		d,
 	}
 
 	go manager.start()
@@ -83,12 +146,14 @@ func (manager *ClientManager) waitForConns(listener net.Listener) {
 		id,_:= strconv.Atoi( string(b[:n]))
 
 		client := &Client{id:id, socket: connection, data: make(chan []byte)}
-		
+		// fmt.Println("connected with",id)
 		manager.register <- client
-		//routines for aparticular client
-		// go manager.receive(client)
 		go manager.send(client)
-		//send unsent operations
+		
+		//send unSent ops  (locking the queue)
+		for _,op := range manager.getMissingOps(id){
+			client.data<-encodeRemoteMsg(op)
+		}
 	}
 }
 
@@ -104,10 +169,15 @@ func (manager *ClientManager) start() {
 			// log.Println("A connection has terminated!")
 		case message := <-manager.broadcast:
 			// log.Println("broadcast triggered")
-			msg := encodeRemoteMsg(message)
 			
-			for _, conn := range manager.active.Values() {
-				con := conn.(*Client)
+			
+			for _, id := range manager.onlineMap.Keys() {
+				con:=manager.getOnlineMap(id)
+				if(con==nil) { // is offline
+					manager.addMissingOps(id,message)
+					continue
+				}
+				msg := encodeRemoteMsg(message)
 				select {
 				case con.data <- msg:
 				default:
@@ -120,13 +190,10 @@ func (manager *ClientManager) start() {
 }
 func (manager *ClientManager) setClientOffline(con *Client) {
 	close(con.data)
-	manager.offline.Add(con.id)
-	
-	manager.active.Remove(con)
+	manager.setOnlineMap(con.id,nil)  //set offline
 }
 func (manager *ClientManager) setClientOnline(con *Client) {
-	manager.active.Add(con)
-	manager.offline.Remove(con.id)
+	manager.setOnlineMap(con.id,con)  //set online
 }
 
 //recieve remote operation from client manager  (need decode the bytes)
@@ -138,6 +205,7 @@ func (client *Client) receive(dfs *Dfs) {
 
 		if err != nil {
 			client.socket.Close()
+			go tryConnect(client.destPort,client.id,dfs)  //socket failure -- try to receieve again
 			break
 		}
 
@@ -158,6 +226,8 @@ func (manager *ClientManager) send(client *Client) {
 		select {
 		case message, ok := <-client.data:
 			if !ok {
+				manager.setClientOffline(client)//set offline
+				manager.addMissingOps(strconv.Itoa(client.id),decodeRemoteMsg(message).(RemoteMsg))//record the usent ops operations
 				return
 			}
 			// log.Println(manager.id," ---------------> ",client.id)
@@ -167,32 +237,40 @@ func (manager *ClientManager) send(client *Client) {
 	}
 }
 
-func newClient(id int) *ClientManager {
+func newClient(d *Dfs) *ClientManager {
 	// fmt.Println("New client...")
 	//attempt to connect to all fixed number of clients
-	manager := newClientManager(id)
+	manager := newClientManager(d)
 	return manager
 }
 func (manager *ClientManager) connectToClients(dfs *Dfs) {
 	for _, i := range dfs.clients {
-		client:=connectToLocalHost(i,manager.id)
-		go client.receive(dfs)
+		go tryConnect(i,manager.id,dfs)
 	}
 }
+func tryConnect(port int,myID int,dfs *Dfs){
+	client:=connectToLocalHost(port,myID)//recieve client
+	go client.receive(dfs)
+} 
 
 //encoding/decoding functions
 
-
+//loop that tries to connect to port and return once able to do so
 func connectToLocalHost(port int,myID int) *Client{
-	connection, error := net.Dial("tcp", "localhost:"+strconv.Itoa(port))
-	if error != nil {
-		fmt.Println(error)
+	var connection net.Conn
+	var err error
+	for true{
+		connection, err = net.Dial("tcp", "localhost:"+strconv.Itoa(port))
+		if err != nil {
+			// log.Println(err)
+			continue//try another time
+		}else{break} //connected
 	}
-		
+			
 	var arr [20]byte
 	copy(arr[:],strconv.Itoa(myID))
 	connection.Write(arr[:])
-	client := &Client{id: myID, socket: connection, data: make(chan []byte)}
+	client := &Client{id: myID,destPort:port, socket: connection, data: make(chan []byte)}
 	
 	return client
 }

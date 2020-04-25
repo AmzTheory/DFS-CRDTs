@@ -74,7 +74,7 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 		// text = strings.Replace(text, "\n", "", 1)
 		text=<-l.intchan
 		
-
+		fmt.Println(text)
 		words := strings.Split(text, " ")
 
 		var el *DfsTreeElement
