@@ -1,7 +1,7 @@
 package main
 
 import (
-	// "fmt"
+	"time"
 )
 
 // "fmt"
@@ -26,7 +26,7 @@ type Dfs struct {
 	hier    *hierLayer
 	rep     *replicationLayer
 	manager *ClientManager
-	clients []int
+	clients map[int]*Client
 	servID  int
 	dfsServ *Client 
 	rem     chan RemoteMsg
@@ -48,7 +48,7 @@ type HierToRep struct {
 
 var on bool
 
-func newDfs(id int, clients []int,servID int) *Dfs {
+func newDfs(id int, clients map[int]*Client,servID int) *Dfs {
 	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg),servID:servID}
 	return &d
 }
@@ -84,16 +84,20 @@ func (d *Dfs) runAll() {
 	go d.ui.run(uiTohier,input)
 
 	d.manager = newClient(d)
+	
+	// time.Sleep(4*time.Second)//this enforce case(1) to occur
+	
 	d.manager.connectToClients(d)
 
 	<-input  //Dfs gods offline
 
+	d.closeClients()
 	//get the data from DB
 	d.rep.writeDB()
 
 }
-func (d *Dfs) startConnecting() {
-	d.manager.connectToClients(d)
+func (d *Dfs) getCurrentState() []interface{} {
+	return d.rep.or.Values()
 }
 
 //triggers to send remote operation to other clients
@@ -109,13 +113,9 @@ func (d *Dfs) start() {
 		connect to the testing server
 	**/
 	ch:=make(chan string)
-	d.dfsServ=getClientUIServer(d.servID,d.id,ch)
+	d.dfsServ=getClientUIServer(d,d.servID,d.id,ch)
 	
 	d.ui = newUserInteface(d.hier.root, d,ch)
-	
-
-
-	// d.ui.printDfs()
 }
 
 //downwards
@@ -151,5 +151,13 @@ func (d *Dfs) updateInterface(root *DfsTreeElement) {
 }
 func (d *Dfs) closeAll() {
 	d.rep.writeDB()
+}
+func (d *Dfs) closeClients(){
+	for _,v:=range d.clients{
+		if(v!=nil){
+		v.socket.Write([]byte("close"))
+		}
+		// v.socket.Close()
+	}
 }
 

@@ -98,7 +98,7 @@ func newClientManager(d *Dfs) *ClientManager {
 	//register used types in gob for the encoding
 	gob.Register(replicationElement{})
 	gob.Register(RemoteMsg{})
-	// gob.Register()
+	gob.Register([]interface{}{})
 	
 
 	// fmt.Println("Starting server for " + strconv.Itoa(id))
@@ -110,7 +110,7 @@ func newClientManager(d *Dfs) *ClientManager {
 	//store the initalOnlineMap with nil (yet to be connected)
 	onlineMap:=cmap.New()
 	unSentOps:=cmap.New()
-	for _,v:=range d.clients{
+	for v,_:=range d.clients{
 		i:=strconv.Itoa(v)
 		onlineMap.Set(i,nil)
 		unSentOps.Set(i,set.New())
@@ -152,8 +152,9 @@ func (manager *ClientManager) waitForConns(listener net.Listener) {
 		
 		//send unSent ops  (locking the queue)
 		for _,op := range manager.getMissingOps(id){
-			client.data<-encodeRemoteMsg(op)
+			client.data<-encodeMsg(op)
 		}
+		go manager.receive(client)
 	}
 }
 
@@ -175,9 +176,10 @@ func (manager *ClientManager) start() {
 				con:=manager.getOnlineMap(id)
 				if(con==nil) { // is offline
 					manager.addMissingOps(id,message)
+					fmt.Println(id,"op is recorded")
 					continue
 				}
-				msg := encodeRemoteMsg(message)
+				msg := encodeMsg(message)
 				select {
 				case con.data <- msg:
 				default:
@@ -191,6 +193,7 @@ func (manager *ClientManager) start() {
 func (manager *ClientManager) setClientOffline(con *Client) {
 	close(con.data)
 	manager.setOnlineMap(con.id,nil)  //set offline
+	fmt.Println(con.id,"gone offline")
 }
 func (manager *ClientManager) setClientOnline(con *Client) {
 	manager.setOnlineMap(con.id,con)  //set online
@@ -210,11 +213,21 @@ func (client *Client) receive(dfs *Dfs) {
 		}
 
 		//decode the bytes into RemoeteMessage
-		rmsg := decodeRemoteMsg(message)
+		rmsg:=decodeMsg(message)
 		// fmt.Println("call by ", dfs)
 		// dfs.sendRemoteToRep(rmsg.(RemoteMsg))
 		dfs.rem<-rmsg.(RemoteMsg)
 	}
+}
+func (manager *ClientManager) receive(client *Client){
+	message := make([]byte, 4096)
+	_, err := client.socket.Read(message)
+	if(err!=nil){
+		log.Println(err)
+	}
+
+	//indicate soc closed
+	manager.unregister<-client
 }
 
 // client manager will send stream of bytes to a client
@@ -224,15 +237,11 @@ func (manager *ClientManager) send(client *Client) {
 	//client will send remote operation as local
 	for {
 		select {
-		case message, ok := <-client.data:
-			if !ok {
-				manager.setClientOffline(client)//set offline
-				manager.addMissingOps(strconv.Itoa(client.id),decodeRemoteMsg(message).(RemoteMsg))//record the usent ops operations
-				return
+		case message, _ := <-client.data:
+			_,err:=client.socket.Write(message)
+			if err!=nil{
+				log.Println(err)
 			}
-			// log.Println(manager.id," ---------------> ",client.id)
-			_,_=client.socket.Write(message)
-			//record an unsent operatoins
 		}
 	}
 }
@@ -244,12 +253,13 @@ func newClient(d *Dfs) *ClientManager {
 	return manager
 }
 func (manager *ClientManager) connectToClients(dfs *Dfs) {
-	for _, i := range dfs.clients {
+	for i,_ := range dfs.clients {
 		go tryConnect(i,manager.id,dfs)
 	}
 }
 func tryConnect(port int,myID int,dfs *Dfs){
 	client:=connectToLocalHost(port,myID)//recieve client
+	dfs.clients[port]=client
 	go client.receive(dfs)
 } 
 
@@ -275,7 +285,7 @@ func connectToLocalHost(port int,myID int) *Client{
 	return client
 }
 
-func (client *Client) recieveInterface(ch chan string){
+func (client *Client) recieveInterface(ch chan string,d *Dfs){
 	for {
 		message := make([]byte, 4096)
 		_, err := client.socket.Read(message)
@@ -287,13 +297,31 @@ func (client *Client) recieveInterface(ch chan string){
 
 		//decode
 		msg:=bytestoString(message)
-		log.Println(msg)
+		if(msg=="state"){
+			client.data<-encodeMsg(d.getCurrentState())
+			continue
+		}
 		ch<-msg
 	}	
 }
-func getClientUIServer(port int,myID int,ch chan string) *Client{
+func (client *Client) sendStateToServer(){
+	defer client.socket.Close()
+
+	//send State to the Dfs starter 
+	for {
+		select {
+		case message, _ := <-client.data:
+			_,err:=client.socket.Write(message)
+			if err!=nil{
+				log.Println(err)
+			}
+		}
+	}
+}
+func getClientUIServer(d *Dfs,port int,myID int,ch chan string) *Client{
 	client:=connectToLocalHost(port,myID)
-	go client.recieveInterface(ch)
+	go client.recieveInterface(ch,d)
+	go client.sendStateToServer()
 	return client
 }
 
@@ -304,7 +332,7 @@ func bytestoString(b []byte) string {
 }
 
 
-func encodeRemoteMsg(rmsg interface{}) []byte {
+func encodeMsg(rmsg interface{}) []byte {
 	var ref bytes.Buffer
 	enc := gob.NewEncoder(&ref)
 
@@ -313,7 +341,7 @@ func encodeRemoteMsg(rmsg interface{}) []byte {
 	return ref.Bytes()
 }
 
-func decodeRemoteMsg(bits []byte) interface{} {
+func decodeMsg(bits []byte) interface{} {
 	var msg RemoteMsg
 	buf := bytes.NewBuffer(bits)
 	err := gob.NewDecoder(buf).Decode(&msg)

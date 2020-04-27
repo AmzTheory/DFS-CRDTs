@@ -169,10 +169,6 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 			l.currentDir = *l.root
 			input <- true
 			break
-		}else if command == "offline" {
-			l.currentDir = *l.root
-			input <- true
-			break
 		}else {
 			fmt.Println("->" + command + " Unknown command")
 		}
