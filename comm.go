@@ -83,12 +83,11 @@ type Client struct {
 	data   	 chan []byte
 }
 																																										
-//ADD & remove operations of the OR_SET
+
 type RemoteMsg struct {
 	SenderID int
 	Msg      string
 	Op       string
-	// Params   []interface{} //operation operand for the operation
 	P1       interface{}
 	P2       interface{}
 }

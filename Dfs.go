@@ -1,7 +1,7 @@
 package main
 
 import (
-	"time"
+	// "time"
 )
 
 // "fmt"
@@ -46,29 +46,30 @@ type HierToRep struct {
 	op       string
 }
 
+const (
+	channellen=5 
+)
+
 var on bool
 
 func newDfs(id int, clients map[int]*Client,servID int) *Dfs {
-	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg),servID:servID}
+	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg,channellen),servID:servID}
 	return &d
 }
 
-// var (
-// 	remToRep chan RemoteMsg
-// )
+
 
 func (d *Dfs) runAll() {
-	on = true
 
 	//channels
-	uiTohier := make(chan UiToHier)
-	hierTorep := make(chan HierToRep)
+	uiTohier := make(chan UiToHier,channellen)
+	hierTorep := make(chan HierToRep,channellen)
 
-	repTohier := make(chan map[*replicationElement]string)
-	hierToui := make(chan *DfsTreeElement)
+	repTohier := make(chan map[*replicationElement]string,channellen)
+	hierToui := make(chan *DfsTreeElement,channellen)
 
 	// remToRep = make(chan RemoteMsg)
-	execOp := make(chan RemoteMsg)
+	execOp := make(chan RemoteMsg,channellen)
 
 	input:=make(chan bool)
 
@@ -112,7 +113,7 @@ func (d *Dfs) start() {
 	/**
 		connect to the testing server
 	**/
-	ch:=make(chan string)
+	ch:=make(chan string,channellen)
 	d.dfsServ=getClientUIServer(d,d.servID,d.id,ch)
 	
 	d.ui = newUserInteface(d.hier.root, d,ch)

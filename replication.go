@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
-
-	set "github.com/emirpasic/gods/sets/linkedhashset"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -21,35 +18,24 @@ type replicationElement struct {
 	ElementType string
 }
 
-
-
-// type elementSet []*replicationElement
-type elementSet *set.Set
 type contentMap map[replicationElement]string
 
 type replicationLayer struct {
 	dfs    *Dfs
-	set    elementSet
 	or     *crdt.ORSet
 	cmap   contentMap
-	opLock sync.Mutex
 }
 
 //initalisation
 func newReplicationLayer(id int,DB bool) *replicationLayer {
 	dbPath = "./src/DFS/data.db"
 	data = "data"
-	s, dic, or :=set.New() , make(map[replicationElement]string), crdt.NewORSet()
-	
-	if(DB){  //read DB
-		s,dic,or =readDB(id)
-	}
+	dic,or :=readDB(id)
 
 
 
 	l := replicationLayer{
 		dfs:  new(Dfs),
-		set:  s,
 		or:   or,
 		cmap: dic,
 	}
@@ -115,8 +101,6 @@ func (l *replicationLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteM
 		rmsg = <-recieve
 
 		send <- rmsg
-
-		// fmt.Println("rep Recieved ", l.dfs.id)
 	}
 }
 
@@ -166,8 +150,7 @@ func (l *replicationLayer) printCurrentState() {
 }
 
 //read the databse
-func readDB(id int) (*set.Set, contentMap, *crdt.ORSet) {
-	s := set.New()
+func readDB(id int) (contentMap, *crdt.ORSet) {
 	or := crdt.NewORSet()
 	contentMap := make(map[replicationElement]string)
 
@@ -192,7 +175,7 @@ func readDB(id int) (*set.Set, contentMap, *crdt.ORSet) {
 
 	}
 	rows.Close()
-	return s, contentMap, or
+	return contentMap, or
 }
 
 func (l *replicationLayer) writeDB() {
