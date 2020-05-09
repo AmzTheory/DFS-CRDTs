@@ -4,7 +4,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"fmt"
 )
 
 // func main() {
@@ -19,25 +18,21 @@ import (
 
 func main() {
 	//id  list of clients TESTServer
-	id,_:=strconv.Atoi(os.Args[1])
-	cls:=os.Args[2]
-	clients:=getMapClients(strings.Split(cls,","))
-	serv,_:=strconv.Atoi(os.Args[3])//
-	fmt.Println(clients)
-	dfs:=newDfs(id,clients,serv)
+	id, _ := strconv.Atoi(os.Args[1])
+	cls := os.Args[2]
+	clients := getMapClients(strings.Split(cls, ","))
+	serv, _ := strconv.Atoi(os.Args[3])
+	dfs := newDfs(id, clients, serv)
 	dfs.start()
 	dfs.runAll()
-
-	
-
 }
 
-func getMapClients(ls []string) map[int]*Client{
-	clients:=map[int]*Client{}
+func getMapClients(ls []string) map[int]*Client {
+	clients := map[int]*Client{}
 	var a int
-	for _,v:=range ls{
-		a,_=strconv.Atoi(v)
-		clients[a]=nil
+	for _, v := range ls {
+		a, _ = strconv.Atoi(v)
+		clients[a] = nil
 	}
 	return clients
 }

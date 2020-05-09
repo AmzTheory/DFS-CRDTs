@@ -5,7 +5,7 @@ import (
 	"fmt"
 	// "os"
 	"strings"
-
+	"context"
 	"github.com/disiqueira/gotree"
 )
 
@@ -24,14 +24,14 @@ import (
 */
 
 type UserInterface struct {
-	root       *DfsTreeElement
+	root       *DfsNode
 	dfs        *Dfs
-	currentDir DfsTreeElement
+	currentDir DfsNode
 	intchan    chan string
 }
 
-func newUserInteface(r *DfsTreeElement, d *Dfs,ch chan string) *UserInterface {
-	return &UserInterface{root: r, dfs: d, currentDir: DfsTreeElement{},intchan:ch}
+func newUserInteface(r *DfsNode, d *Dfs,ch chan string) *UserInterface {
+	return &UserInterface{root: r, dfs: d, currentDir: DfsNode{},intchan:ch}
 }
 
 func (l UserInterface) printDfs() {
@@ -39,7 +39,7 @@ func (l UserInterface) printDfs() {
 	printDfsHelper(&dfsTree, l.root.children)
 	fmt.Println(dfsTree.Print())
 }
-func printDfsHelper(root *gotree.Tree, children []*DfsTreeElement) {
+func printDfsHelper(root *gotree.Tree, children map[string]*DfsNode) {
 	for _, i := range children {
 		subTree := (*root).Add(format(*i))
 		if len(i.children) != 0 {
@@ -48,15 +48,15 @@ func printDfsHelper(root *gotree.Tree, children []*DfsTreeElement) {
 	}
 }
 
-func (l *UserInterface) recieveInitialRoot(recieve chan *DfsTreeElement) {
+func (l *UserInterface) recieveInitialRoot(recieve chan *DfsNode) {
 	l.root = <-recieve //recieve the inital root
 	//run or runBackground can be executed as gorotuines after this method get invoked
 	l.currentDir = *l.root
 }
 
-func (l *UserInterface) run(send chan UiToHier, input chan bool) {	
+func (l *UserInterface) run(send chan UiToHier, status chan bool) {	
 	/**
-	cd  change current Directory
+	cd [name/-r]change current Directory
 	ls  show files in current directory
 	mk [name] [type]  create file/folder in the current directory
 	rm [name] [type]  remove file/folder  //
@@ -65,6 +65,8 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 	*/
 	// reader := bufio.NewReader(os.Stdin)
 	//infinite loop
+	var ctx context.Context
+	var cancel context.CancelFunc
 	var text string
 	for {
 
@@ -77,18 +79,17 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 		fmt.Println(text)
 		words := strings.Split(text, " ")
 
-		var el *DfsTreeElement
 		command := words[0]
 		if command == "ls" {
-
-			for i := 0; i < len(l.currentDir.children); i++ {
-				el = l.currentDir.children[i]
-				if el.fileType == "dir" {
-					fmt.Println("\t+" + el.name + "\t" + el.fileType)
-				} else {
-					fmt.Println("\t" + el.name + "\t" + el.fileType)
+			for _,v:=range l.currentDir.children {
+				fmt.Print("\t")
+				if (v.fileType=="dir"){
+					fmt.Print("+")
 				}
+			
+				fmt.Println(v.name + "\t" + v.fileType)
 			}
+			
 		} else if command == "cd" {
 			dirName := words[1]
 			found := false
@@ -98,13 +99,18 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 				found = true
 			}
 
-			for i := 0; i < len(l.currentDir.children) && !found; i++ {
-				el = l.currentDir.children[i]
-				if el.fileType == "dir" && el.name == dirName {
-					l.currentDir = *el
-					found = true
-				}
+			if dirName == "-c"  {
+				l.currentDir = *l.currentDir.parent
+				found = true
 			}
+
+			// for i := 0; i < len(l.currentDir.children) && !found; i++ {
+			// 	el = l.currentDir.children[i]
+			// 	if el.fileType == "dir" && el.name == dirName {
+			// 		l.currentDir = *el
+			// 		found = true
+			// 	}
+			// }
 
 			if !found {
 				fmt.Println("\t make sure " + dirName + " is directory and does exist")
@@ -123,13 +129,18 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 				continue
 			}
 
+			ctx, cancel=context.WithCancel(context.Background())
 			// l.dfs.updateAddHier(currentDir.getPath(), name, fileType)
 			send <- UiToHier{
 				path:     l.currentDir.getPath(),
 				name:     name,
 				fileType: fileType,
 				op:       "add",
+				cancel:	  cancel,
 			}
+
+			<-ctx.Done() //the op has been executed
+
 			//wait for an update
 			// l.root = <-recieve
 			// currentDir = l.updateNodePointer(currentDir.getPath())
@@ -139,6 +150,8 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 				fmt.Println("\trm is defined as : rm  name fileType")
 				continue
 			}
+
+			
 			name := words[1]
 			fileType := words[2]
 			if !exists(&l.currentDir, name, fileType) {
@@ -146,15 +159,18 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 				continue
 			}
 
+			ctx, cancel=context.WithCancel(context.Background())
+
 			// l.dfs.updateRemoveHier(currentDir.getPath()+name, fileType)
 			send <- UiToHier{
 				path:     l.currentDir.getPath() + name,
 				name:     "",
 				fileType: fileType,
 				op:       "rm",
+				cancel:   cancel,
 			}
 			//wait for an update
-			// l.root = <-recieve
+			<-ctx.Done() //the op has been executed
 		} else if command == "printfs" {
 			l.printDfs()
 		} else if command == "help" {
@@ -167,7 +183,7 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 			fmt.Println("\toffline   go offline")
 		} else if command == "quit" {
 			l.currentDir = *l.root
-			input <- true
+			status <- true
 			break
 		}else {
 			fmt.Println("->" + command + " Unknown command")
@@ -176,10 +192,7 @@ func (l *UserInterface) run(send chan UiToHier, input chan bool) {
 
 }
 
-func (l *UserInterface) runSend(send chan UiToHier) {
-
-}
-func (l *UserInterface) runRecieve(recieve chan *DfsTreeElement) {
+func (l *UserInterface) runRecieve(recieve chan *DfsNode) {
 	for {
 		l.root = <-recieve
 		l.currentDir = l.updateNodePointer(l.currentDir.getPath())
@@ -187,11 +200,11 @@ func (l *UserInterface) runRecieve(recieve chan *DfsTreeElement) {
 	}
 }
 
-func (l *UserInterface) updateState(root *DfsTreeElement) {
+func (l *UserInterface) updateState(root *DfsNode) {
 	l.root = root
 	//l.printDfs()
 }
-func (l *UserInterface) updateNodePointer(path string) DfsTreeElement {
+func (l *UserInterface) updateNodePointer(path string) DfsNode {
 	r := l.root
 	dirs := strings.Split(path[1:], "/")
 
@@ -200,33 +213,36 @@ func (l *UserInterface) updateNodePointer(path string) DfsTreeElement {
 	}
 
 	for i := 0; i < len(dirs)-1; i++ {
-		fmt.Println(r.name)
-		r = findNode(r, dirs[i])
+		// fmt.Println(r.name)
+		if a:=findNode(r, dirs[i]);a!=nil{
+			r=a
+		}else{
+			return *r
+		}
+		
 	}
 	return *r
 
 }
-func findNode(root *DfsTreeElement, dir string) *DfsTreeElement {
-	for i := 0; i < len(root.children); i++ {
-		if root.children[i].name == dir {
-			return root.children[i]
-		}
+func findNode(root *DfsNode, dir string) *DfsNode {
+	for k,v:=range root.children{
+		if k==dir{
+			return v 
+		} 
 	}
 	return nil
 }
 
 //TODO: expand to go deeper in the tree
-func exists(root *DfsTreeElement, path, fileType string) bool {
-	var el DfsTreeElement
-	for i := 0; i < len(root.children); i++ {
-		el = *root.children[i]
+func exists(root *DfsNode, path, fileType string) bool {
+	for _,el:=range root.children{
 		if el.name == path && el.fileType == fileType {
 			return true
 		}
 	}
 	return false
 }
-func format(el DfsTreeElement) string {
+func format(el DfsNode) string {
 	if el.fileType == "dir" {
 		return el.name
 	}

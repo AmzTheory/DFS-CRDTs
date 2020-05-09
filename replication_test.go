@@ -22,7 +22,7 @@ import (
 )
 
 func TestAdd(t *testing.T){
-	rep:=newReplicationLayer(1,false)
+	rep:=newRepLayer(1)
 
 
 	var tests = []struct {
@@ -38,7 +38,7 @@ func TestAdd(t *testing.T){
 			{"/c/", "dir","3",[]interface{}{newRE("/","dir"),newRE("/a","txt"),newRE("/c/","dir")},[]interface{}{newRE("/","dir"),newRE("/a","txt"),newRE("/c/","dir")}},  //add dir
 			
 		}
-		var el replicationElement
+		var el RepElem
 		for _, test := range tests {
 			el=newRE(test.name,test.ty)
 			
@@ -52,17 +52,17 @@ func TestAdd(t *testing.T){
 			gotDic:=getMapKeys(rep.cmap)
 			
 			if len(difference(gotSet,test.wantSet))>0{
-				t.Errorf("add(%s,%s)  Set= %s, want %s", el.Name,el.ElementType, gotSet,test.wantSet)
+				t.Errorf("add(%s,%s)  Set= %s, want %s", el.name,el.elemType, gotSet,test.wantSet)
 			}
 
 			if len(difference(gotDic,test.wantDic))>0{
-				t.Errorf("add(%s,%s)  Dic= %s, want %s", el.Name,el.ElementType, gotDic,test.wantDic)
+				t.Errorf("add(%s,%s)  Dic= %s, want %s", el.name,el.elemType, gotDic,test.wantDic)
 			}
 		}
 }
 
 func TestRemove(t *testing.T){
-	rep:=newReplicationLayer(1,false)
+	rep:=newRepLayer(1)
 	
 	rep.add(newRE("/","dir"),"1")
 	rep.add(newRE("/a","txt"),"2")
@@ -81,7 +81,7 @@ func TestRemove(t *testing.T){
 			{"/a","txt",[]interface{}{"2","3"}, []interface{}{newRE("/","dir")}, []interface{}{newRE("/","dir"),newRE("/a","txt"),newRE("/d/","dir")}},  //remove and element added twice
 			{"/c","dir",[]interface{}{"2","3"}, []interface{}{newRE("/","dir")}, []interface{}{newRE("/","dir"),newRE("/a","txt"),newRE("/d/","dir")}},  //remove and element that doesnt exist
 		} 
-		var el replicationElement
+		var el RepElem
 		for _, test := range tests {
 			el=newRE(test.name,test.ty)
 			
@@ -95,11 +95,11 @@ func TestRemove(t *testing.T){
 			gotDic:=getMapKeys(rep.cmap)
 			
 			if len(difference(gotSet,test.wantSet))>0{
-				t.Errorf("remove((%s,%s),%s)  Set= %s, want %s", el.Name,el.ElementType,test.r, gotSet,test.wantSet)
+				t.Errorf("remove((%s,%s),%s)  Set= %s, want %s", el.name,el.elemType,test.r, gotSet,test.wantSet)
 			}
 
 			if len(difference(gotDic,test.wantDic))>0{
-				t.Errorf("remove((%s,%s),%s)  dic= %s, want %s", el.Name,el.ElementType,test.r, gotDic,test.wantDic)
+				t.Errorf("remove((%s,%s),%s)  dic= %s, want %s", el.name,el.elemType,test.r, gotDic,test.wantDic)
 			}
 		}
 }
@@ -110,7 +110,7 @@ func TestRemove(t *testing.T){
 
 
 //helperFunctions
-func getMapKeys(mymap map[replicationElement]string) []interface{}{
+func getMapKeys(mymap map[RepElem]string) []interface{}{
 	keys := []interface{}{}
 	for k := range mymap {
     	keys = append(keys, k)
@@ -119,8 +119,8 @@ func getMapKeys(mymap map[replicationElement]string) []interface{}{
 }
 
 //
-func newRE(name,typ string) replicationElement{
-	return replicationElement{Name:name,ElementType:typ}
+func newRE(name,typ string) RepElem{
+	return RepElem{name:name,elemType:typ}
 }
 
 func difference(slice1 []interface{}, slice2 []interface{}) ([]interface{}){

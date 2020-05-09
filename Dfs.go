@@ -1,16 +1,17 @@
 package main
 
-import (
-	// "time"
-)
+// "time"
 
 // "fmt"
+import (
+	"context"
+)
 
 /*
 	instance of
 		UserInterface
 		Hier
-		replication
+		replication	x
 	Model communication
 		between layers
 
@@ -23,14 +24,15 @@ import (
 type Dfs struct {
 	id      int
 	ui      *UserInterface
-	hier    *hierLayer
-	rep     *replicationLayer
+	hier    *HierLayer
+	rep     *RepLayer
 	manager *ClientManager
 	clients map[int]*Client
-	servID  int
-	dfsServ *Client 
+	uiID    int
+	uiServ  *Client
 	rem     chan RemoteMsg
 }
+
 
 //messages type
 type UiToHier struct {
@@ -38,59 +40,63 @@ type UiToHier struct {
 	name     string
 	fileType string
 	op       string
+	cancel   context.CancelFunc
 }
 
 type HierToRep struct {
 	path     string
 	fileType string
 	op       string
+	cancel   context.CancelFunc
 }
 
 const (
-	channellen=5 
+	channellen = 5
 )
 
 var on bool
 
-func newDfs(id int, clients map[int]*Client,servID int) *Dfs {
-	d := Dfs{id: id, clients: clients, hier: newhierLayer(), rep: newReplicationLayer(id,true),rem:make(chan RemoteMsg,channellen),servID:servID}
+func newDfs(id int, clients map[int]*Client, servID int) *Dfs {
+	h := newHierLayer()
+	r := newRepLayer(id)
+	d := Dfs{id: id, clients: clients, hier: h, rep: r, rem: make(chan RemoteMsg, channellen), uiID: servID}
+	d.hier.dfs = &d
+	d.rep.dfs = &d
 	return &d
 }
-
-
 
 func (d *Dfs) runAll() {
 
 	//channels
-	uiTohier := make(chan UiToHier,channellen)
-	hierTorep := make(chan HierToRep,channellen)
+	uiTohier := make(chan UiToHier, channellen)
+	hierTorep := make(chan HierToRep, channellen)
 
-	repTohier := make(chan map[*replicationElement]string,channellen)
-	hierToui := make(chan *DfsTreeElement,channellen)
+	repTohier := make(chan map[*RepElem]string, channellen)
+	hierToui := make(chan *DfsNode, channellen)
 
 	// remToRep = make(chan RemoteMsg)
-	execOp := make(chan RemoteMsg,channellen)
+	execOp := make(chan RemoteMsg, channellen)
 
-	input:=make(chan bool)
+	input := make(chan bool)
 
 	//go routines
 	go d.hier.runDown(uiTohier, hierTorep) //run hier  top->down
 	go d.hier.runUp(repTohier, hierToui)   //run hier  down -> top
 	go d.rep.runLocally(execOp, hierTorep) //run rep local thread
 	go d.rep.runRemotely(execOp, d.rem)
-	go d.rep.pushUpState(repTohier, execOp)
+	go d.rep.executeOp(repTohier, execOp)
 
 	d.ui.recieveInitialRoot(hierToui)
 	go d.ui.runRecieve(hierToui)
-	go d.ui.run(uiTohier,input)
+	go d.ui.run(uiTohier, input)
 
 	d.manager = newClient(d)
-	
+
 	// time.Sleep(4*time.Second)//this enforce case(1) to occur
-	
+
 	d.manager.connectToClients(d)
 
-	<-input  //Dfs gods offline
+	<-input //Dfs gods offline
 
 	d.closeClients()
 	//get the data from DB
@@ -107,58 +113,23 @@ func (d *Dfs) sendRemote(msg RemoteMsg) {
 }
 
 func (d *Dfs) start() {
-	d.rep.setDfs(d)
-	d.hier.setDfs(d)
-	
 	/**
 		connect to the testing server
 	**/
-	ch:=make(chan string,channellen)
-	d.dfsServ=getClientUIServer(d,d.servID,d.id,ch)
-	
-	d.ui = newUserInteface(d.hier.root, d,ch)
+	ch := make(chan string, channellen)
+	d.uiServ = getClientUIServer(d, d.uiID, d.id, ch)
+
+	d.ui = newUserInteface(d.hier.root, d, ch)
 }
 
-//downwards
-
-//User interface to Hier
-// func (d *Dfs) updateAddHier(path string, n string, typ string) {
-// 	d.UpdateAddReplication(path+n, typ)
-// }
-// func (d *Dfs) updateRemoveHier(path string, typ string) {
-// 	d.UpdateRemoveReplication(path, typ)
-// }
-
-//update
-
-// //Hier to replication
-// func (d *Dfs) UpdateAddReplication(path string, typ string) {
-// 	d.rep.add(path, typ)
-// }
-// func (d *Dfs) UpdateRemoveReplication(path string, typ string) {
-// 	d.rep.remove(path, typ)
-// }
-
-//replication to other replicas (future)
-
-//upwards
-
-func (d *Dfs) updateHier(cmap map[*replicationElement]string) {
-	d.hier.updateState(cmap) //infor hier layer
-}
-
-func (d *Dfs) updateInterface(root *DfsTreeElement) {
-	d.ui.updateState(root)
-}
 func (d *Dfs) closeAll() {
 	d.rep.writeDB()
 }
-func (d *Dfs) closeClients(){
-	for _,v:=range d.clients{
-		if(v!=nil){
-		v.socket.Write([]byte("close"))
+func (d *Dfs) closeClients() {
+	for _, v := range d.clients {
+		if v != nil {
+			v.socket.Write([]byte("close"))
 		}
 		// v.socket.Close()
 	}
 }
-

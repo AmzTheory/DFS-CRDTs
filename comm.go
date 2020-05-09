@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 	"strconv"
-
+	"context"
 	set "github.com/emirpasic/gods/sets/linkedhashset"
 	// queue "github.com/enriquebris/goconcurrentqueue"
 	cmap "github.com/orcaman/concurrent-map"
@@ -36,14 +36,9 @@ recover lost replica con (client side)
 		once found , the recive will trigger
 			recieve will notice socket fialure
 						return to 1
-
-
-
 */
 type ClientManager struct {
 	id         int //client ID
-	active     *set.Set
-	offline    *set.Set
 	onlineMap  *cmap.ConcurrentMap
 	unSentOps  *cmap.ConcurrentMap
 	broadcast  chan RemoteMsg //remote message
@@ -90,12 +85,13 @@ type RemoteMsg struct {
 	Op       string
 	P1       interface{}
 	P2       interface{}
+	cancel   context.CancelFunc
 }
 
 
 func newClientManager(d *Dfs) *ClientManager {
 	//register used types in gob for the encoding
-	gob.Register(replicationElement{})
+	gob.Register(RepElem{})
 	gob.Register(RemoteMsg{})
 	gob.Register([]interface{}{})
 	
@@ -117,8 +113,6 @@ func newClientManager(d *Dfs) *ClientManager {
 
 	manager := ClientManager{
 		id:         d.id,
-		active:     set.New(), //empty set (will be added when connected)
-		offline:    set.New(),
 		onlineMap:  &onlineMap,
 		unSentOps:  &unSentOps,
 		broadcast:  make(chan RemoteMsg),
