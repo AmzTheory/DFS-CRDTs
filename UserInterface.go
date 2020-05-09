@@ -184,6 +184,14 @@ func (l *UserInterface) run(send chan UiToHier, status chan bool) {
 		} else if command == "quit" {
 			l.currentDir = *l.root
 			status <- true
+			ctx, cancel=context.WithCancel(context.Background())
+			
+			send <- UiToHier{
+				op:       "quit",
+				cancel:	  cancel,
+			}
+
+			<-ctx.Done() //the op has been executed
 			break
 		}else {
 			fmt.Println("->" + command + " Unknown command")

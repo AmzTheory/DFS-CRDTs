@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	_ "github.com/mattn/go-sqlite3"
+	"context"
 )
 
 var dbPath string
@@ -57,6 +58,9 @@ func (l *RepLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
 			u = l.or.SrcAdd(el)
 		} else if msg.op == "rm" {
 			u = l.or.SrcRemove(el)
+		}else if msg.op=="quit"{
+			send <-  RemoteMsg{Op: msg.op, cancel:msg.cancel}
+			break //close thread
 		}
 		// rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
 		rmsg := RemoteMsg{SenderID: -1, Op: msg.op,P1:el,P2:u,cancel:msg.cancel,}
@@ -68,15 +72,78 @@ func (l *RepLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
 }
 
 //execute operation and update hier
-func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteMsg) {
+// func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteMsg,cancel context.CancelFunc) {
+// 	send <- l.returnCurrentSet() //send the initial state
+// 	var opMsg RemoteMsg
+// 	var el, u interface{}
+// 	var r []interface{}
+// 	for { //wait for operation to be executed local/remotely
+// 		opMsg = <-recieve
+// 		// fmt.Println(opMsg)
+// 		if opMsg.Op == "add" {
+// 			// el = opMsg.Params[0]
+// 			// u = opMsg.Params[1]
+// 			el=opMsg.P1
+// 			u=opMsg.P2
+// 			l.add(el.(RepElem), u.(string))
+// 		} else if opMsg.Op == "rm" {
+// 			// el = opMsg.Params[0]
+// 			// u = opMsg.Params[1]
+// 			el=opMsg.P1
+// 			u=opMsg.P2
+// 			r = u.([]interface{})
+// 			l.remove(r, el)
+// 		} else if opMsg.Op == "rm" {
+// 			//execute all operations remaing in buffer channel
+// 			// for len(opMsg)!=0{
+
+// 			// }
+// 			cancel()//notify DFS cancelation
+// 		}
+
+// 		if(opMsg.cancel!=nil){opMsg.cancel()}
+// 		send <- l.returnCurrentSet()
+// 	}
+// }
+func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteMsg,cancel context.CancelFunc) {
 	send <- l.returnCurrentSet() //send the initial state
 	var opMsg RemoteMsg
-	var el, u interface{}
-	var r []interface{}
+	
 	for { //wait for operation to be executed local/remotely
 		opMsg = <-recieve
 		// fmt.Println(opMsg)
-		if opMsg.Op == "add" {
+		if opMsg.Op == "quit" {
+			opMsg.cancel()
+			for len(recieve)!=0{//read all remaing operations
+				l.execute(<-recieve)
+			}
+			cancel()// notify DFS we're done executing all operations
+			break //close the thread
+		}else{
+			l.execute(opMsg)
+		}
+
+		if(opMsg.cancel!=nil){opMsg.cancel()}
+		send <- l.returnCurrentSet()
+	}
+}
+
+//listen remotely
+func (l *RepLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteMsg) {
+	var rmsg RemoteMsg
+	var ok bool
+	for {
+		rmsg,ok = <-recieve
+		if(ok==false){break} //break the loop because we'are not expecting any remote operations
+		send <- rmsg
+		//must be handle
+	}
+}
+
+func (l *RepLayer) execute(opMsg RemoteMsg){
+	var el, u interface{}
+	var r []interface{}
+	if opMsg.Op == "add" {
 			// el = opMsg.Params[0]
 			// u = opMsg.Params[1]
 			el=opMsg.P1
@@ -90,23 +157,7 @@ func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteM
 			r = u.([]interface{})
 			l.remove(r, el)
 		}
-
-		if(opMsg.cancel!=nil){opMsg.cancel()}
-		send <- l.returnCurrentSet()
-	}
 }
-
-//listen remotely
-func (l *RepLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteMsg) {
-	var rmsg RemoteMsg
-	for {
-		rmsg = <-recieve
-
-		send <- rmsg
-	}
-}
-
-//update inteface
 
 func (l *RepLayer) add(el RepElem, u string) {
 	l.or.Add(u, el)

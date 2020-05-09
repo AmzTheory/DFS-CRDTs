@@ -5,6 +5,7 @@ package main
 // "fmt"
 import (
 	"context"
+	"time"
 )
 
 /*
@@ -79,12 +80,14 @@ func (d *Dfs) runAll() {
 
 	input := make(chan bool)
 
+	ctx, cancel:=context.WithCancel(context.Background())
+
 	//go routines
 	go d.hier.runDown(uiTohier, hierTorep) //run hier  top->down
 	go d.hier.runUp(repTohier, hierToui)   //run hier  down -> top
 	go d.rep.runLocally(execOp, hierTorep) //run rep local thread
 	go d.rep.runRemotely(execOp, d.rem)
-	go d.rep.executeOp(repTohier, execOp)
+	go d.rep.executeOp(repTohier, execOp,cancel)
 
 	d.ui.recieveInitialRoot(hierToui)
 	go d.ui.runRecieve(hierToui)
@@ -95,13 +98,18 @@ func (d *Dfs) runAll() {
 	// time.Sleep(4*time.Second)//this enforce case(1) to occur
 
 	d.manager.connectToClients(d)
-
 	<-input //Dfs gods offline
 
 	d.closeClients()
-	//get the data from DB
-	d.rep.writeDB()
+	close(d.rem)
+	//at this point no operation will be recieved (eithe local or remote)
 
+	//wait for done (All local and remote operation has been executed)
+	<-ctx.Done()
+
+	//write in DB
+	d.rep.writeDB()
+	
 }
 func (d *Dfs) getCurrentState() []interface{} {
 	return d.rep.or.Values()
@@ -132,4 +140,5 @@ func (d *Dfs) closeClients() {
 		}
 		// v.socket.Close()
 	}
+	time.Sleep(time.Second) //give some time for other replicas to respond (declare offline)
 }

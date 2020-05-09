@@ -137,8 +137,6 @@ func (l *HierLayer) skipP(mapping map[*RepElem]string) {
 
 
 
-
-//axulariy functions
 func (l *HierLayer) runDown(ui chan UiToHier,rep chan HierToRep){
 
 	for{ 
@@ -152,7 +150,10 @@ func (l *HierLayer) runDown(ui chan UiToHier,rep chan HierToRep){
 
 
 		rep <-msgR  //sending message to replication layer
+		if(msgR.op=="quit"){break} //break the loop if the UI is closing
 	}
+	//handle quiting
+	
 }
 func (l* HierLayer) runUp(rep chan map[*RepElem]string ,ui chan *DfsNode){
 	for{
@@ -162,6 +163,7 @@ func (l* HierLayer) runUp(rep chan map[*RepElem]string ,ui chan *DfsNode){
 
 		ui <-l.root //send the root to ui
 	}
+	
 }
 
 func findRoot(cmap map[*RepElem]string) string {
