@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"net"
@@ -77,7 +76,14 @@ type Client struct {
 	socket 	 net.Conn
 	data   	 chan []byte
 }
-																																										
+
+type RMsg struct {
+	SenderID int
+	Msg      string
+	Op       string
+	P1       interface{}
+	P2       interface{}
+}
 
 type RemoteMsg struct {
 	SenderID int
@@ -85,15 +91,17 @@ type RemoteMsg struct {
 	Op       string
 	P1       interface{}
 	P2       interface{}
+	
+}
+type RemoteMsgWithCancel struct {
+	rm 		 RemoteMsg		 
 	cancel   context.CancelFunc
 }
 
 
-func newClientManager(d *Dfs) *ClientManager {
+func newClientManager(d *Dfs,unSent *cmap.ConcurrentMap) *ClientManager {
 	//register used types in gob for the encoding
-	gob.Register(RepElem{})
-	gob.Register(RemoteMsg{})
-	gob.Register([]interface{}{})
+	
 	
 
 	// fmt.Println("Starting server for " + strconv.Itoa(id))
@@ -104,17 +112,17 @@ func newClientManager(d *Dfs) *ClientManager {
 	}
 	//store the initalOnlineMap with nil (yet to be connected)
 	onlineMap:=cmap.New()
-	unSentOps:=cmap.New()
+	// unSentOps:=unSent
 	for v,_:=range d.clients{
 		i:=strconv.Itoa(v)
 		onlineMap.Set(i,nil)
-		unSentOps.Set(i,set.New())
+		// unSentOps.Set(i,set.New())
 	}
 
 	manager := ClientManager{
 		id:         d.id,
 		onlineMap:  &onlineMap,
-		unSentOps:  &unSentOps,
+		unSentOps:  unSent,
 		broadcast:  make(chan RemoteMsg),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
@@ -239,10 +247,10 @@ func (manager *ClientManager) send(client *Client) {
 	}
 }
 
-func newClient(d *Dfs) *ClientManager {
+func newClient(d *Dfs,ma *cmap.ConcurrentMap) *ClientManager {
 	// fmt.Println("New client...")
 	//attempt to connect to all fixed number of clients
-	manager := newClientManager(d)
+	manager := newClientManager(d,ma)
 	return manager
 }
 func (manager *ClientManager) connectToClients(dfs *Dfs) {
@@ -325,25 +333,3 @@ func bytestoString(b []byte) string {
 }
 
 
-func encodeMsg(rmsg interface{}) []byte {
-	var ref bytes.Buffer
-	enc := gob.NewEncoder(&ref)
-
-	err := enc.Encode(rmsg)
-	logEncDecError(err, "encode remote")
-	return ref.Bytes()
-}
-
-func decodeMsg(bits []byte) interface{} {
-	var msg RemoteMsg
-	buf := bytes.NewBuffer(bits)
-	err := gob.NewDecoder(buf).Decode(&msg)
-	logEncDecError(err, "decode remote")
-	return msg
-}
-
-func logEncDecError(err error, str string) {
-	if err != nil {
-		log.Fatal(str+" error:", err)
-	}
-}

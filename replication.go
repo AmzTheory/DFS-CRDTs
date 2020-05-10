@@ -8,10 +8,15 @@ import (
 	"strings"
 	_ "github.com/mattn/go-sqlite3"
 	"context"
+	set "github.com/emirpasic/gods/sets/linkedhashset"
 )
 
-var dbPath string
-var data string
+const (
+	dbPath string   ="./src/DFS/data.db"
+	data string   	="data"
+	missing string  ="MissingOps"
+)
+
 
 //Structs and type
 type RepElem struct {
@@ -29,8 +34,6 @@ type RepLayer struct {
 
 //initalisation
 func newRepLayer(id int) *RepLayer {
-	dbPath = "./src/DFS/data.db"
-	data = "data"
 	dic,or :=readDB(id)
 
 
@@ -49,7 +52,7 @@ func (l *RepLayer) setDfs(dfs *Dfs) {
 
 //run locally & remotely comunicate theire messages to pushupState, which in turn get excuted by pushupstate, then passed to upper layers
 
-func (l *RepLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
+func (l *RepLayer) runLocally(send chan RemoteMsgWithCancel, recieve chan HierToRep) {
 	for {
 		msg := <-recieve
 		var el, u interface{}
@@ -59,14 +62,14 @@ func (l *RepLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
 		} else if msg.op == "rm" {
 			u = l.or.SrcRemove(el)
 		}else if msg.op=="quit"{
-			send <-  RemoteMsg{Op: msg.op, cancel:msg.cancel}
+			send <-  RemoteMsgWithCancel{rm:RemoteMsg{Op: msg.op}, cancel:msg.cancel}
 			break //close thread
 		}
 		// rmsg:=RemoteMsg{SenderID:-1,Op:msg.op,Params:[]string{msg.path,msg.fileType},}
-		rmsg := RemoteMsg{SenderID: -1, Op: msg.op,P1:el,P2:u,cancel:msg.cancel,}
+		rmsg := RemoteMsgWithCancel{rm:RemoteMsg{SenderID: -1, Op: msg.op,P1:el,P2:u},cancel:msg.cancel,}
 		// fmt.Println(u)
 		send <- rmsg
-		go l.dfs.sendRemote(rmsg) //TODO: might miss local execution
+		go l.dfs.sendRemote(rmsg.rm) //TODO: might miss local execution
 		// send <- l.returnCurrentSet() //send the updated set to hier
 	}
 }
@@ -105,22 +108,24 @@ func (l *RepLayer) runLocally(send chan RemoteMsg, recieve chan HierToRep) {
 // 		send <- l.returnCurrentSet()
 // 	}
 // }
-func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteMsg,cancel context.CancelFunc) {
+func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteMsgWithCancel,cancel context.CancelFunc) {
 	send <- l.returnCurrentSet() //send the initial state
-	var opMsg RemoteMsg
+	var opMsg RemoteMsgWithCancel
 	
 	for { //wait for operation to be executed local/remotely
 		opMsg = <-recieve
 		// fmt.Println(opMsg)
-		if opMsg.Op == "quit" {
+		if opMsg.rm.Op == "quit" {
 			opMsg.cancel()
 			for len(recieve)!=0{//read all remaing operations
-				l.execute(<-recieve)
+				r:=<-recieve
+				l.execute(r.rm)
+				
 			}
 			cancel()// notify DFS we're done executing all operations
 			break //close the thread
 		}else{
-			l.execute(opMsg)
+			l.execute(opMsg.rm)
 		}
 
 		if(opMsg.cancel!=nil){opMsg.cancel()}
@@ -129,13 +134,13 @@ func (l *RepLayer) executeOp(send chan map[*RepElem]string, recieve chan RemoteM
 }
 
 //listen remotely
-func (l *RepLayer) runRemotely(send chan RemoteMsg, recieve chan RemoteMsg) {
+func (l *RepLayer) runRemotely(send chan RemoteMsgWithCancel, recieve chan RemoteMsg) {
 	var rmsg RemoteMsg
 	var ok bool
 	for {
 		rmsg,ok = <-recieve
 		if(ok==false){break} //break the loop because we'are not expecting any remote operations
-		send <- rmsg
+		send <- RemoteMsgWithCancel{rm:rmsg}
 		//must be handle
 	}
 }
@@ -186,8 +191,8 @@ func readDB(id int) (contentMap, *crdt.ORSet) {
 	or := crdt.NewORSet()
 	contentMap := make(map[RepElem]string)
 
-	database, err := sql.Open("sqlite3", dbPath)
-	checkErr(err)
+	database, err:= sql.Open("sqlite3", dbPath)
+	
 
 	rows, err := database.Query("SELECT path,type,content,used,token from " + data + " where dfsId=" + strconv.Itoa(id))
 	checkErr(err)
@@ -211,10 +216,13 @@ func readDB(id int) (contentMap, *crdt.ORSet) {
 }
 
 func (l *RepLayer) writeDB() {
-	database, _ := sql.Open("sqlite3", dbPath)
+	database, err:= sql.Open("sqlite3", dbPath)
+	
 	//delete dfs records
 	id := (*l.dfs).id
 	statement, err := database.Prepare("delete from " + data + " where dfsID=" + strconv.Itoa(id))
+	statement.Exec()
+	statement, err = database.Prepare("delete from " + missing + " where dfsID=" + strconv.Itoa(id))
 	statement.Exec()
 	checkErr(err)
 	// //creating data table
@@ -237,6 +245,17 @@ func (l *RepLayer) writeDB() {
 		checkErr(err)
 		statement.Exec(k.Name, k.ElemType, v, used, l.dfs.id, token)
 
+	}
+
+	//record unSentOperations
+	statement, err = database.Prepare("INSERT INTO " + missing + " (dfsID,msg,destID) VALUES (?,?,?)")
+	
+	for k, v := range l.dfs.manager.unSentOps.Items(){
+		dest,_:=strconv.Atoi(k)
+		for _,u:=range v.(*set.Set).Values(){
+			checkErr(err)
+			statement.Exec(l.dfs.id,encodeMsg(u), dest)
+		}
 	}
 }
 

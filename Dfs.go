@@ -5,7 +5,15 @@ package main
 // "fmt"
 import (
 	"context"
+	"bytes"
+	"log"
 	"time"
+	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
+	cmap "github.com/orcaman/concurrent-map"
+	"strconv"
+	set "github.com/emirpasic/gods/sets/linkedhashset"
+	"encoding/gob"
 )
 
 /*
@@ -53,11 +61,16 @@ type HierToRep struct {
 
 const (
 	channellen = 5
+	dir        ="dir"
 )
 
 var on bool
 
 func newDfs(id int, clients map[int]*Client, servID int) *Dfs {
+	gob.Register(RepElem{})
+	gob.Register(RemoteMsg{})
+	gob.Register([]interface{}{})
+	
 	h := newHierLayer()
 	r := newRepLayer(id)
 	d := Dfs{id: id, clients: clients, hier: h, rep: r, rem: make(chan RemoteMsg, channellen), uiID: servID}
@@ -76,7 +89,7 @@ func (d *Dfs) runAll() {
 	hierToui := make(chan *DfsNode, channellen)
 
 	// remToRep = make(chan RemoteMsg)
-	execOp := make(chan RemoteMsg, channellen)
+	execOp := make(chan RemoteMsgWithCancel, channellen)
 
 	input := make(chan bool)
 
@@ -93,7 +106,7 @@ func (d *Dfs) runAll() {
 	go d.ui.runRecieve(hierToui)
 	go d.ui.run(uiTohier, input)
 
-	d.manager = newClient(d)
+	d.manager = newClient(d,d.readUnSentOps())
 
 	// time.Sleep(4*time.Second)//this enforce case(1) to occur
 
@@ -141,4 +154,53 @@ func (d *Dfs) closeClients() {
 		// v.socket.Close()
 	}
 	time.Sleep(time.Second) //give some time for other replicas to respond (declare offline)
+}
+
+func (d *Dfs) readUnSentOps() *cmap.ConcurrentMap {
+	cmap := cmap.New()
+
+	database, err:= sql.Open("sqlite3", dbPath)
+	checkErr(err)
+
+	q:="SELECT msg from " + missing + " where dfsId=" + strconv.Itoa(d.id)+ " and destID=?"
+	
+	var rmsg RemoteMsg
+	
+	for k:=range d.clients{
+		rows, err := database.Query(q,k)
+		checkErr(err)
+		se:=set.New()
+		var msg []byte
+		for rows.Next() {
+			rows.Scan(&msg)
+			rmsg=decodeMsg(msg).(RemoteMsg)
+			se.Add(rmsg)
+		}
+		cmap.Set(strconv.Itoa(k),se)
+		rows.Close()
+	}
+	
+	return &cmap
+}
+func encodeMsg(rmsg interface{}) []byte {
+	var ref bytes.Buffer
+	enc := gob.NewEncoder(&ref)
+
+	err := enc.Encode(rmsg)
+	logEncDecError(err, "encode remote")
+	return ref.Bytes()
+}
+
+func decodeMsg(bits []byte) interface{} {
+	var msg RemoteMsg
+	buf := bytes.NewBuffer(bits)
+	err := gob.NewDecoder(buf).Decode(&msg)
+	logEncDecError(err, "decode remote")
+	return msg
+}
+
+func logEncDecError(err error, str string) {
+	if err != nil {
+		log.Fatal(str+" error:", err)
+	}
 }

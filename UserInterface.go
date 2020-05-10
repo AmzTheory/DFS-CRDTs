@@ -100,17 +100,14 @@ func (l *UserInterface) run(send chan UiToHier, status chan bool) {
 			}
 
 			if dirName == "-c"  {
-				l.currentDir = *l.currentDir.parent
-				found = true
+				ro,ok:=getRandomDir(l.currentDir)
+				if(ok){
+					l.currentDir=ro
+					found=true
+				}
 			}
 
-			// for i := 0; i < len(l.currentDir.children) && !found; i++ {
-			// 	el = l.currentDir.children[i]
-			// 	if el.fileType == "dir" && el.name == dirName {
-			// 		l.currentDir = *el
-			// 		found = true
-			// 	}
-			// }
+			
 
 			if !found {
 				fmt.Println("\t make sure " + dirName + " is directory and does exist")
@@ -122,8 +119,24 @@ func (l *UserInterface) run(send chan UiToHier, status chan bool) {
 				continue
 			}
 
+
 			name := words[1]
 			fileType := words[2]
+
+			if(name=="-r"){
+				var ro DfsNode
+				var ok bool
+				if(fileType==dir){
+					ro,ok=getRandomDir(l.currentDir)
+				}else{
+					ro,ok=getRandomNonDir(l.currentDir)
+				}
+				if(!ok){ // doesnt exists
+					continue
+				}
+				name=ro.name
+			}
+			
 			if exists(&l.currentDir, name, fileType) {
 				fmt.Println("\t" + name + " does exist at the current directory!")
 				continue
@@ -232,6 +245,24 @@ func (l *UserInterface) updateNodePointer(path string) DfsNode {
 	return *r
 
 }
+func getRandomDir(root DfsNode) (DfsNode,bool){
+	for _,v:=range root.children{
+			if(v.fileType==dir){
+				return *v,true
+			}
+	}
+	return DfsNode{},false
+}
+func getRandomNonDir(root DfsNode) (DfsNode,bool){
+	for _,v:=range root.children{
+			if(v.fileType!=dir){
+				return *v,true
+			}
+	}
+	return DfsNode{},false
+}
+
+
 func findNode(root *DfsNode, dir string) *DfsNode {
 	for k,v:=range root.children{
 		if k==dir{
